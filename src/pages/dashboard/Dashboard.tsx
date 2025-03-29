@@ -1,4 +1,4 @@
-// src/pages/dashboard/Dashboard.tsx (actualizado)
+// src/pages/dashboard/Dashboard.tsx
 import React, { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import {
@@ -47,10 +47,10 @@ const Dashboard = () => {
         // Aquí simulamos los datos para el ejemplo
         
         // Obtener mensajes no leídos
-        const mensajesResponse = await axiosInstance.get('/mensajes?bandeja=recibidos&leido=false');
+        const mensajesResponse = await axiosInstance.get('/api/mensajes?bandeja=recibidos&leido=false');
         
         // Obtener notificaciones pendientes
-        const notificacionesResponse = await axiosInstance.get('/notificaciones?estado=PENDIENTE');
+        const notificacionesResponse = await axiosInstance.get('/api/notificaciones?estado=PENDIENTE');
         
         const dashboardData: DashboardData = {
           mensajesNoLeidos: mensajesResponse.data.meta?.total || 0,

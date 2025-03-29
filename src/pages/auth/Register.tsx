@@ -1,6 +1,7 @@
 // src/pages/auth/Register.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
 import { Formik, Form, Field } from 'formik';
 import * as Yup from 'yup';
 import {
@@ -16,7 +17,14 @@ import {
   MenuItem,
   Alert,
   CircularProgress,
+  InputAdornment,
+  IconButton,
 } from '@mui/material';
+import { Visibility, VisibilityOff } from '@mui/icons-material';
+import { register } from '../../services/authService';
+import { registerStart, registerSuccess, registerFailure } from '../../redux/slices/authSlice';
+import { RootState } from '../../redux/store';
+import { ensureUserHasState } from '../../types/user.types';
 import axiosInstance from '../../api/axiosConfig';
 
 // Esquema de validación con Yup
@@ -39,19 +47,28 @@ const RegisterSchema = Yup.object().shape({
 
 const Register = () => {
   const navigate = useNavigate();
-  const [error, setError] = useState<string | null>(null);
+  const dispatch = useDispatch();
   const [escuelas, setEscuelas] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   
-  React.useEffect(() => {
+  // Obtener estado de autenticación del Redux store
+  const { loading, error } = useSelector((state: RootState) => state.auth);
+  
+  useEffect(() => {
     // Cargar la lista de escuelas
     const fetchEscuelas = async () => {
       try {
         const response = await axiosInstance.get('/escuelas');
-        setEscuelas(response.data.data || []);
+        if (response.data && response.data.data) {
+          setEscuelas(response.data.data);
+        } else {
+          console.warn('Formato de respuesta inesperado al cargar escuelas');
+          setEscuelas([{ _id: '67b929303b00e9a4c428c9f2', nombre: 'Escuela Demo' }]);
+        }
       } catch (err) {
         console.error('Error al cargar escuelas:', err);
-        setEscuelas([{ _id: '67b929303b00e9a4c428c9f2', nombre: 'Escuela Demo' }]); // Valor por defecto para desarrollo
+        // Valor por defecto para desarrollo
+        setEscuelas([{ _id: '67b929303b00e9a4c428c9f2', nombre: 'Escuela Demo' }]);
       }
     };
     
@@ -60,24 +77,27 @@ const Register = () => {
 
   const handleSubmit = async (values: any, { setSubmitting }: any) => {
     try {
-      setError(null);
-      setLoading(true);
+      dispatch(registerStart());
       
-      await axiosInstance.post('/auth/register', values);
+      const { user } = await register(values);
+      dispatch(registerSuccess(ensureUserHasState(user)));
       
       // Registro exitoso, redirigir al login
       navigate('/login', { state: { message: 'Registro exitoso. Puedes iniciar sesión ahora.' } });
     } catch (err: any) {
       const errorMessage = err.response?.data?.message || 'Error al registrarse';
-      setError(errorMessage);
+      dispatch(registerFailure(errorMessage));
     } finally {
       setSubmitting(false);
-      setLoading(false);
     }
   };
 
   const navigateToLogin = () => {
     navigate('/login');
+  };
+
+  const handleTogglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
   };
 
   return (
@@ -90,7 +110,7 @@ const Register = () => {
           alignItems: 'center',
         }}
       >
-        <Paper elevation={3} sx={{ p: 4, width: '100%' }}>
+        <Paper elevation={3} sx={{ p: 4, width: '100%', borderRadius: 3, boxShadow: '0px 4px 4px rgba(0, 0, 0, 0.05)' }}>
           <Typography component="h1" variant="h5" align="center" gutterBottom>
             EducaNexo360
           </Typography>
@@ -164,12 +184,25 @@ const Register = () => {
                     fullWidth
                     name="password"
                     label="Contraseña"
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     id="password"
                     autoComplete="new-password"
                     margin="normal"
                     error={touched.password && Boolean(errors.password)}
                     helperText={touched.password && errors.password}
+                    InputProps={{
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton
+                            aria-label="toggle password visibility"
+                            onClick={handleTogglePasswordVisibility}
+                            edge="end"
+                          >
+                            {showPassword ? <VisibilityOff /> : <Visibility />}
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    }}
                   />
                 </Box>
                 
@@ -228,7 +261,7 @@ const Register = () => {
                   variant="contained"
                   color="primary"
                   disabled={isSubmitting || loading}
-                  sx={{ mt: 3, mb: 2 }}
+                  sx={{ mt: 3, mb: 2, borderRadius: '20px' }}
                 >
                   {(isSubmitting || loading) ? <CircularProgress size={24} /> : 'Registrarse'}
                 </Button>

@@ -1,500 +1,517 @@
 // src/pages/usuarios/DetalleUsuario.tsx
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
+import { useFormik } from 'formik';
+import * as Yup from 'yup';
 import {
   Box,
   Typography,
-  Paper,
-  Grid,
-  Chip,
+  TextField,
   Button,
+  Grid,
+  Paper,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
   CircularProgress,
   Alert,
+  FormHelperText,
   Divider,
-  Avatar,
-  List,
-  ListItem,
-  ListItemText,
-  Card,
-  CardContent,
-  IconButton,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
 } from '@mui/material';
 import {
-  ArrowBack,
-  Edit,
-  Delete,
-  Person,
-  Email,
-  School,
-  VerifiedUser,
-  CalendarToday,
-  AccessTime,
+  Save as SaveIcon,
+  Cancel as CancelIcon,
+  Key as KeyIcon,
+  Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import axiosInstance from '../../api/axiosConfig';
-import { useSelector } from 'react-redux';
+import AsociarEstudiantes from '../../components/usuarios/AsociarEstudiantes';
 import { RootState } from '../../redux/store';
 
-interface UsuarioDetalle {
+interface Escuela {
+  _id: string;
+  nombre: string;
+}
+
+interface InfoAcademica {
+  grado?: string;
+  docente_principal?: string;
+  cursos?: string[];
+  estudiantes_asociados?: string[];
+}
+
+interface Usuario {
   _id: string;
   nombre: string;
   apellidos: string;
   email: string;
   tipo: string;
+  escuelaId: string;
   estado: string;
-  escuelaId: {
-    _id: string;
-    nombre: string;
-  };
-  createdAt: string;
-  updatedAt: string;
-  // Más campos que pueda tener el usuario
+  info_academica?: InfoAcademica;
 }
 
-const DetalleUsuario = () => {
+const DetalleUsuario: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useSelector((state: RootState) => state.auth);
-  const [usuario, setUsuario] = useState<UsuarioDetalle | null>(null);
+  const isNewUser = id === 'nuevo' || !id;
+  
+  const [usuario, setUsuario] = useState<Usuario | null>(null);
+  const [escuelas, setEscuelas] = useState<Escuela[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [saveLoading, setSaveLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [deleteDialog, setDeleteDialog] = useState<boolean>(false);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [estudiantesAsociados, setEstudiantesAsociados] = useState<string[]>([]);
+  const [escuelasLoaded, setEscuelasLoaded] = useState<boolean>(false);
 
-  useEffect(() => {
-    cargarUsuario();
-  }, [id]);
+  // Schema de validación
+  const validationSchema = Yup.object({
+    nombre: Yup.string().required('El nombre es requerido'),
+    apellidos: Yup.string().required('Los apellidos son requeridos'),
+    email: Yup.string().email('Email inválido').required('El email es requerido'),
+    tipo: Yup.string().required('El tipo de usuario es requerido'),
+    escuelaId: Yup.string().required('La escuela es requerida'),
+    password: isNewUser ? Yup.string().min(6, 'La contraseña debe tener al menos 6 caracteres').required('La contraseña es requerida') : Yup.string(),
+  });
 
-  const cargarUsuario = async () => {
-    if (!id) return;
+  // Formik para manejo del formulario
+  const formik = useFormik({
+    initialValues: {
+      nombre: '',
+      apellidos: '',
+      email: '',
+      tipo: '',
+      escuelaId: '',
+      password: '',
+      estado: 'ACTIVO',
+    },
+    validationSchema,
+    onSubmit: async (values) => {
+      try {
+        setSaveLoading(true);
+        setError(null);
+        setSuccess(null);
+        
+        // Preparar datos a enviar
+        const dataToSend = { ...values } as { [key: string]: any };
+        
+        // Eliminamos password si está vacío para no enviarlo
+        if (!dataToSend.password) {
+          delete dataToSend.password;
+        }
+        
+        // Si es un acudiente, incluir estudiantes asociados
+        if (values.tipo === 'ACUDIENTE' && !isNewUser) {
+          dataToSend.info_academica = {
+            ...dataToSend.info_academica,
+            estudiantes_asociados: estudiantesAsociados
+          };
+        }
+        
+        console.log('Datos a enviar:', dataToSend);
+        
+        if (isNewUser) {
+          // Crear nuevo usuario
+          const createResponse = await axiosInstance.post('/auth/register', dataToSend);
+          console.log('Respuesta de creación:', createResponse);
+          setSuccess('Usuario creado exitosamente');
+          setTimeout(() => navigate('/usuarios'), 2000);
+        } else {
+          // Actualizar usuario existente
+          const updateResponse = await axiosInstance.put(`/usuarios/${id}`, dataToSend);
+          console.log('Respuesta de actualización:', updateResponse);
+          setSuccess('Usuario actualizado exitosamente');
+          
+          // Recargar el usuario para mostrar los cambios
+          cargarUsuario();
+        }
+      } catch (err: any) {
+        console.error('Error al guardar usuario:', err);
+        setError(err.response?.data?.message || 'Error al guardar los datos del usuario');
+      } finally {
+        setSaveLoading(false);
+      }
+    },
+  });
 
+  // Función para cargar las escuelas
+  const cargarEscuelas = async () => {
     try {
-      setLoading(true);
-      setError(null);
-
-      const response = await axiosInstance.get(`/usuarios/${id}`);
+      console.log('Cargando escuelas...');
+      const response = await axiosInstance.get('/escuelas');
       
-      if (response.data?.success) {
-        setUsuario(response.data.data);
+      if (response.data && response.data.data) {
+        console.log('Escuelas cargadas:', response.data.data.length);
+        setEscuelas(response.data.data || []);
+        setEscuelasLoaded(true);
       } else {
-        throw new Error('Error al cargar usuario');
+        console.error('Formato de respuesta inesperado al cargar escuelas:', response);
+        setError('Error al cargar la lista de escuelas');
       }
     } catch (err: any) {
-      console.error('Error al cargar usuario:', err);
-      setError(err.response?.data?.message || 'No se pudo cargar la información del usuario');
-    } finally {
-      setLoading(false);
+      console.error('Error al cargar escuelas:', err);
+      
+      if (err.response && err.response.status === 403) {
+        console.log('Error de permisos. Intentando usar la escuela del usuario actual.');
+        // Si hay error de permisos, usamos la escuela del usuario actual
+        if (user && user.escuelaId) {
+          setEscuelas([{ _id: user.escuelaId, nombre: 'Tu escuela actual' }]);
+          setEscuelasLoaded(true);
+        }
+      }
     }
   };
 
-  // Obtener etiqueta para el tipo de usuario
+  // Función para cargar el usuario
+  const cargarUsuario = async () => {
+    try {
+      setError(null);
+      
+      if (!isNewUser && id) {
+        console.log('Cargando usuario con ID:', id);
+        const response = await axiosInstance.get(`/usuarios/${id}`);
+        
+        if (response.data && response.data.data) {
+          const userData = response.data.data;
+          console.log('Usuario cargado:', userData);
+          setUsuario(userData);
+          
+          // Establecer los valores del formulario
+          formik.setValues({
+            nombre: userData.nombre || '',
+            apellidos: userData.apellidos || '',
+            email: userData.email || '',
+            tipo: userData.tipo || '',
+            escuelaId: userData.escuelaId || '',
+            password: '', // No cargamos la contraseña por seguridad
+            estado: userData.estado || 'ACTIVO',
+          });
+          
+          // Establecer estudiantes asociados si es un acudiente
+          if (userData.tipo === 'ACUDIENTE' && userData.info_academica?.estudiantes_asociados) {
+            setEstudiantesAsociados(userData.info_academica.estudiantes_asociados);
+          }
+        } else {
+          console.error('Formato de respuesta inesperado al cargar usuario:', response);
+          setError('Error al cargar los datos del usuario');
+        }
+      } else if (isNewUser && user && user.escuelaId) {
+        // Si es un usuario nuevo, establecer la escuela del usuario actual por defecto
+        formik.setFieldValue('escuelaId', user.escuelaId);
+      }
+    } catch (err: any) {
+      console.error('Error al cargar usuario:', err);
+      setError(err.response?.data?.message || 'Error al cargar los datos del usuario');
+    }
+  };
+
+  // Cargar datos iniciales al montar el componente
+  useEffect(() => {
+    const inicializarComponente = async () => {
+      setLoading(true);
+      
+      try {
+        // Primero cargar las escuelas
+        await cargarEscuelas();
+        
+        // Luego cargar el usuario (si no es nuevo)
+        if (!isNewUser) {
+          await cargarUsuario();
+        } else {
+          // Si es un usuario nuevo y tenemos la escuelaId del usuario actual, la usamos
+          if (user && user.escuelaId) {
+            formik.setFieldValue('escuelaId', user.escuelaId);
+          }
+        }
+      } catch (err) {
+        console.error('Error durante la inicialización del componente:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    inicializarComponente();
+  }, [id, isNewUser]);
+
+  const handleCambiarPassword = () => {
+    navigate(`/usuarios/${id}/cambiar-password`);
+  };
+
+  const handleEstudiantesChange = (estudiantes: string[]) => {
+    setEstudiantesAsociados(estudiantes);
+  };
+
+  const handleRecargarEscuelas = async () => {
+    setLoading(true);
+    await cargarEscuelas();
+    setLoading(false);
+  };
+
   const getTipoLabel = (tipo: string) => {
-    switch (tipo) {
+    switch(tipo) {
       case 'ADMIN': return 'Administrador';
       case 'DOCENTE': return 'Docente';
-      case 'PADRE': return 'Padre de Familia';
       case 'ESTUDIANTE': return 'Estudiante';
+      case 'ACUDIENTE': return 'Acudiente';
+      case 'COORDINADOR': return 'Coordinador';
+      case 'RECTOR': return 'Rector';
+      case 'ADMINISTRATIVO': return 'Administrativo';
       default: return tipo;
     }
   };
 
-  // Obtener color para el chip de estado
-  const getEstadoColor = (estado: string) => {
-    switch (estado) {
-      case 'ACTIVO': return 'success';
-      case 'INACTIVO': return 'error';
-      default: return 'default';
-    }
-  };
-
-  // Obtener color para el chip de tipo de usuario
-  const getTipoColor = (tipo: string) => {
-    switch (tipo) {
-      case 'ADMIN': return 'secondary';
-      case 'DOCENTE': return 'primary';
-      case 'PADRE': return 'info';
-      case 'ESTUDIANTE': return 'warning';
-      default: return 'default';
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    if (!dateString) return 'N/A';
-    
-    const options: Intl.DateTimeFormatOptions = { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    };
-    return new Date(dateString).toLocaleDateString('es-ES', options);
-  };
-
-  // Obtener iniciales para el avatar
-  const getInitials = (nombre: string, apellidos: string) => {
-    if (!nombre || !apellidos) return '?';
-    return `${nombre.charAt(0)}${apellidos.charAt(0)}`.toUpperCase();
-  };
-
-  // Obtener color de fondo para el avatar según el tipo
-  const getAvatarBgColor = (tipo: string) => {
-    switch (tipo) {
-      case 'ADMIN': return '#003F91'; // Color principal
-      case 'DOCENTE': return '#5DA9E9'; // Color secundario
-      case 'PADRE': return '#4CAF50'; // Verde
-      case 'ESTUDIANTE': return '#FFC107'; // Amarillo
-      default: return '#f8f9fa'; // Gris claro
-    }
-  };
-
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
-
-  if (error) {
-    return (
-      <Box>
-        <Button
-          startIcon={<ArrowBack />}
-          onClick={() => navigate('/usuarios')}
-          sx={{ mb: 3 }}
-        >
-          Volver a la lista
-        </Button>
-        
-        <Alert 
-          severity="error" 
-          sx={{ 
-            borderRadius: 2,
-            '& .MuiAlert-message': {
-              fontWeight: 500
-            }
-          }}
-        >
-          {error}
-        </Alert>
-      </Box>
-    );
-  }
-
-  if (!usuario) {
-    return (
-      <Box>
-        <Button
-          startIcon={<ArrowBack />}
-          onClick={() => navigate('/usuarios')}
-          sx={{ mb: 3 }}
-        >
-          Volver a la lista
-        </Button>
-        
-        <Alert 
-          severity="info" 
-          sx={{ 
-            borderRadius: 2,
-            '& .MuiAlert-message': {
-              fontWeight: 500
-            }
-          }}
-        >
-          No se encontró información del usuario
-        </Alert>
-      </Box>
-    );
-  }
-
   return (
     <Box>
-      {/* Botón para regresar y título */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3, flexWrap: 'wrap' }}>
-        <Button
-          variant="outlined"
-          startIcon={<ArrowBack />}
-          onClick={() => navigate('/usuarios')}
-          sx={{ 
-            borderRadius: 20,
-            borderColor: 'rgba(0, 0, 0, 0.12)',
-            color: 'text.secondary'
-          }}
-        >
-          Volver a la lista
-        </Button>
-        
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<Edit />}
-            onClick={() => navigate(`/usuarios/editar/${usuario._id}`)}
-            sx={{ 
-              borderRadius: 20,
-              fontWeight: 500,
-              boxShadow: 'none',
-              '&:hover': {
-                boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.1)'
-              }
-            }}
-          >
-            Editar
-          </Button>
-            
-          <Button
-            variant="outlined"
-            color="primary"
-            onClick={() => navigate(`/usuarios/${usuario._id}/cambiar-password`)}
-            sx={{ 
-              borderRadius: 20,
-              '&:hover': {
-                backgroundColor: 'rgba(0, 63, 145, 0.04)'
-              }
-            }}
-          >
-            Cambiar Contraseña
-          </Button>
-          
-          {user?._id !== usuario._id && (
-            <Button
-              variant="outlined"
-              color="error"
-              startIcon={<Delete />}
-              onClick={() => setDeleteDialog(true)}
-              sx={{ 
-                borderRadius: 20,
-                borderColor: 'error.main',
-                '&:hover': {
-                  backgroundColor: 'rgba(244, 67, 54, 0.04)'
-                }
-              }}
+      <Typography variant="h1" color="primary.main" gutterBottom>
+        {isNewUser ? 'Nuevo Usuario' : 'Editar Usuario'}
+      </Typography>
+      
+      {error && (
+        <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
+          {error}
+        </Alert>
+      )}
+      
+      {success && (
+        <Alert severity="success" sx={{ mb: 3, borderRadius: 2 }}>
+          {success}
+        </Alert>
+      )}
+      
+      {!escuelasLoaded && (
+        <Alert 
+          severity="warning" 
+          sx={{ mb: 3, borderRadius: 2 }}
+          action={
+            <Button 
+              color="inherit" 
+              size="small"
+              startIcon={<RefreshIcon />}
+              onClick={handleRecargarEscuelas}
             >
-              Eliminar
+              Intentar de nuevo
             </Button>
-          )}
+          }
+        >
+          No se pudieron cargar las escuelas. Puede continuar con la escuela actual o intentar recargar.
+        </Alert>
+      )}
+      
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 5 }}>
+          <CircularProgress />
         </Box>
-      </Box>
-
-      {/* Información del usuario */}
-      <Grid container spacing={3}>
-        {/* Tarjeta de perfil */}
-        <Grid item xs={12} md={4}>
-          <Card 
-            elevation={0} 
-            sx={{ 
-              borderRadius: 3,
-              overflow: 'hidden',
-              boxShadow: '0px 4px 4px rgba(0, 0, 0, 0.05)',
-            }}
-          >
-            <Box sx={{ 
-              bgcolor: getAvatarBgColor(usuario.tipo), 
-              color: 'white', 
-              py: 4, 
-              display: 'flex', 
-              flexDirection: 'column', 
-              alignItems: 'center' 
-            }}>
-              <Avatar 
-                sx={{ 
-                  width: 100, 
-                  height: 100, 
-                  bgcolor: 'white', 
-                  color: getAvatarBgColor(usuario.tipo),
-                  fontSize: 36,
-                  fontWeight: 'bold',
-                  mb: 2
-                }}
-              >
-                {getInitials(usuario.nombre, usuario.apellidos)}
-              </Avatar>
-              <Typography variant="h5" fontWeight="bold" gutterBottom>
-                {usuario.nombre} {usuario.apellidos}
-              </Typography>
-              <Chip
-                label={getTipoLabel(usuario.tipo)}
-                color={getTipoColor(usuario.tipo) as any}
-                sx={{ 
-                  fontWeight: 'bold', 
-                  borderRadius: 8,
-                  bgcolor: 'white',
-                  color: getAvatarBgColor(usuario.tipo)
-                }}
-              />
-            </Box>
-            <CardContent>
-              <List>
-                <ListItem>
-                  <Email color="primary" sx={{ mr: 2 }} />
-                  <ListItemText
-                    primary="Correo electrónico"
-                    secondary={usuario.email}
-                    primaryTypographyProps={{ variant: 'caption', color: 'text.secondary' }}
-                    secondaryTypographyProps={{ variant: 'body1', fontWeight: 500 }}
-                  />
-                </ListItem>
-                <Divider component="li" />
-                <ListItem>
-                  <School color="primary" sx={{ mr: 2 }} />
-                  <ListItemText
-                    primary="Escuela"
-                    secondary={usuario.escuelaId?.nombre || 'No especificado'}
-                    primaryTypographyProps={{ variant: 'caption', color: 'text.secondary' }}
-                    secondaryTypographyProps={{ variant: 'body1', fontWeight: 500 }}
-                  />
-                </ListItem>
-                <Divider component="li" />
-                <ListItem>
-                  <VerifiedUser color="primary" sx={{ mr: 2 }} />
-                  <ListItemText
-                    primary="Estado"
-                    secondary={
-                      <Chip
-                        label={usuario.estado}
-                        color={getEstadoColor(usuario.estado) as any}
-                        size="small"
-                        sx={{ fontWeight: 'bold', borderRadius: 8 }}
-                      />
-                    }
-                    primaryTypographyProps={{ variant: 'caption', color: 'text.secondary' }}
-                  />
-                </ListItem>
-              </List>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Información detallada */}
-        <Grid item xs={12} md={8}>
+      ) : (
+        <>
           <Paper 
             elevation={0} 
             sx={{ 
+              p: 3, 
               borderRadius: 3,
-              overflow: 'hidden',
               boxShadow: '0px 4px 4px rgba(0, 0, 0, 0.05)',
-              height: '100%'
+              mb: 3
             }}
           >
-            <Box sx={{ bgcolor: 'primary.main', color: 'white', px: 3, py: 2 }}>
-              <Typography variant="h3">Información detallada</Typography>
-            </Box>
-            <Box sx={{ p: 3 }}>
+            <form onSubmit={formik.handleSubmit}>
               <Grid container spacing={3}>
-                <Grid item xs={12}>
-                  <Typography variant="h3" color="primary.main" gutterBottom>Datos del Usuario</Typography>
-                  <Divider sx={{ mb: 2 }} />
-                </Grid>
                 <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" color="text.secondary">Nombre Completo</Typography>
-                  <Typography variant="body1" fontWeight={500} sx={{ mb: 2 }}>
-                    {usuario.nombre} {usuario.apellidos}
-                  </Typography>
-                  
-                  <Typography variant="subtitle2" color="text.secondary">Correo Electrónico</Typography>
-                  <Typography variant="body1" fontWeight={500} sx={{ mb: 2 }}>
-                    {usuario.email}
-                  </Typography>
-                  
-                  <Typography variant="subtitle2" color="text.secondary">Tipo de Usuario</Typography>
-                  <Typography variant="body1" fontWeight={500} sx={{ mb: 2 }}>
-                    {getTipoLabel(usuario.tipo)}
-                  </Typography>
+                  <TextField
+                    fullWidth
+                    id="nombre"
+                    name="nombre"
+                    label="Nombre"
+                    value={formik.values.nombre}
+                    onChange={formik.handleChange}
+                    onBlur={formik.handleBlur}
+                    error={formik.touched.nombre && Boolean(formik.errors.nombre)}
+                    helperText={formik.touched.nombre && formik.errors.nombre}
+                    disabled={saveLoading}
+                  />
                 </Grid>
+                
                 <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" color="text.secondary">Estado</Typography>
-                  <Typography variant="body1" fontWeight={500} sx={{ mb: 2 }}>
-                    {usuario.estado}
-                  </Typography>
-                  
-                  <Typography variant="subtitle2" color="text.secondary">Escuela</Typography>
-                  <Typography variant="body1" fontWeight={500} sx={{ mb: 2 }}>
-                    {usuario.escuelaId?.nombre || 'No especificado'}
-                  </Typography>
-                  
-                  <Typography variant="subtitle2" color="text.secondary">ID de Usuario</Typography>
-                  <Typography variant="body1" fontWeight={500} sx={{ mb: 2 }}>
-                    {usuario._id}
-                  </Typography>
+                  <TextField
+                    fullWidth
+                    id="apellidos"
+                    name="apellidos"
+                    label="Apellidos"
+                    value={formik.values.apellidos}
+                    onChange={formik.handleChange}
+                    onBlur={formik.handleBlur}
+                    error={formik.touched.apellidos && Boolean(formik.errors.apellidos)}
+                    helperText={formik.touched.apellidos && formik.errors.apellidos}
+                    disabled={saveLoading}
+                  />
+                </Grid>
+                
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    id="email"
+                    name="email"
+                    label="Email"
+                    value={formik.values.email}
+                    onChange={formik.handleChange}
+                    onBlur={formik.handleBlur}
+                    error={formik.touched.email && Boolean(formik.errors.email)}
+                    helperText={formik.touched.email && formik.errors.email}
+                    disabled={saveLoading}
+                  />
+                </Grid>
+                
+                <Grid item xs={12} sm={6}>
+                  <FormControl 
+                    fullWidth
+                    error={formik.touched.tipo && Boolean(formik.errors.tipo)}
+                    disabled={saveLoading}
+                  >
+                    <InputLabel id="tipo-label">Tipo de Usuario</InputLabel>
+                    <Select
+                      labelId="tipo-label"
+                      id="tipo"
+                      name="tipo"
+                      value={formik.values.tipo}
+                      label="Tipo de Usuario"
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                    >
+                      <MenuItem value="ADMIN">Administrador</MenuItem>
+                      <MenuItem value="DOCENTE">Docente</MenuItem>
+                      <MenuItem value="ESTUDIANTE">Estudiante</MenuItem>
+                      <MenuItem value="ACUDIENTE">Acudiente</MenuItem>
+                      <MenuItem value="COORDINADOR">Coordinador</MenuItem>
+                      <MenuItem value="RECTOR">Rector</MenuItem>
+                      <MenuItem value="ADMINISTRATIVO">Administrativo</MenuItem>
+                    </Select>
+                    {formik.touched.tipo && formik.errors.tipo && (
+                      <FormHelperText>{formik.errors.tipo}</FormHelperText>
+                    )}
+                  </FormControl>
                 </Grid>
 
+                <Grid item xs={12} sm={6}>
+                  <FormControl 
+                    fullWidth
+                    error={formik.touched.escuelaId && Boolean(formik.errors.escuelaId)}
+                    // Siempre deshabilitar el campo escuela para todos los roles
+                    disabled={true}
+                  >
+                    <InputLabel id="escuela-label">Escuela</InputLabel>
+                    <Select
+                      labelId="escuela-label"
+                      id="escuelaId"
+                      name="escuelaId"
+                      value={formik.values.escuelaId}
+                      label="Escuela"
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                    >
+                      {escuelas.map((escuela) => (
+                        <MenuItem key={escuela._id} value={escuela._id}>
+                          {escuela.nombre}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                    {formik.touched.escuelaId && formik.errors.escuelaId && (
+                      <FormHelperText>{formik.errors.escuelaId}</FormHelperText>
+                    )}
+                    <FormHelperText>La escuela no puede modificarse. Se utiliza la escuela actual.</FormHelperText>
+                  </FormControl>
+                </Grid>
+                
+                <Grid item xs={12} sm={6}>
+                  <FormControl 
+                    fullWidth
+                    disabled={saveLoading}
+                  >
+                    <InputLabel id="estado-label">Estado</InputLabel>
+                    <Select
+                      labelId="estado-label"
+                      id="estado"
+                      name="estado"
+                      value={formik.values.estado}
+                      label="Estado"
+                      onChange={formik.handleChange}
+                    >
+                      <MenuItem value="ACTIVO">Activo</MenuItem>
+                      <MenuItem value="INACTIVO">Inactivo</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                
+                {isNewUser && (
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      id="password"
+                      name="password"
+                      label="Contraseña"
+                      type="password"
+                      value={formik.values.password}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      error={formik.touched.password && Boolean(formik.errors.password)}
+                      helperText={formik.touched.password && formik.errors.password}
+                      disabled={saveLoading}
+                    />
+                  </Grid>
+                )}
+                
                 <Grid item xs={12}>
-                  <Typography variant="h3" color="primary.main" gutterBottom>Información del Sistema</Typography>
-                  <Divider sx={{ mb: 2 }} />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" color="text.secondary">Fecha de Registro</Typography>
-                  <Typography variant="body1" fontWeight={500} sx={{ mb: 2 }}>
-                    {formatDate(usuario.createdAt)}
-                  </Typography>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle2" color="text.secondary">Última Actualización</Typography>
-                  <Typography variant="body1" fontWeight={500} sx={{ mb: 2 }}>
-                    {formatDate(usuario.updatedAt)}
-                  </Typography>
+                  <Divider sx={{ my: 2 }} />
+                  
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+                    {!isNewUser && (
+                      <Button
+                        variant="outlined"
+                        startIcon={<KeyIcon />}
+                        onClick={handleCambiarPassword}
+                        disabled={saveLoading}
+                        sx={{ borderRadius: '20px' }}
+                      >
+                        Cambiar Contraseña
+                      </Button>
+                    )}
+                    
+                    <Button
+                      variant="outlined"
+                      startIcon={<CancelIcon />}
+                      onClick={() => navigate('/usuarios')}
+                      disabled={saveLoading}
+                      sx={{ borderRadius: '20px' }}
+                    >
+                      Cancelar
+                    </Button>
+                    
+                    <Button
+                      type="submit"
+                      variant="contained"
+                      startIcon={saveLoading ? <CircularProgress size={24} /> : <SaveIcon />}
+                      disabled={saveLoading}
+                      sx={{ borderRadius: '20px' }}
+                    >
+                      {saveLoading ? 'Guardando...' : 'Guardar'}
+                    </Button>
+                  </Box>
                 </Grid>
               </Grid>
-            </Box>
+            </form>
           </Paper>
-        </Grid>
-      </Grid>
-
-      {/* Diálogo de confirmación para eliminar usuario */}
-      <Dialog
-        open={deleteDialog}
-        onClose={() => setDeleteDialog(false)}
-        PaperProps={{
-          sx: {
-            borderRadius: 3,
-            boxShadow: '0px 8px 24px rgba(0, 0, 0, 0.15)',
-          }
-        }}
-      >
-        <DialogTitle>Confirmar eliminación</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            ¿Está seguro que desea desactivar el usuario {usuario.nombre} {usuario.apellidos}? Esta acción no se puede deshacer.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions sx={{ p: 2, pt: 0 }}>
-          <Button 
-            onClick={() => setDeleteDialog(false)} 
-            color="inherit"
-            sx={{ 
-              borderRadius: 20,
-              px: 3
-            }}
-          >
-            Cancelar
-          </Button>
-          <Button 
-            onClick={async () => {
-              try {
-                await axiosInstance.delete(`/usuarios/${usuario._id}`);
-                navigate('/usuarios', { state: { message: 'Usuario eliminado exitosamente' } });
-              } catch (err) {
-                console.error('Error al eliminar usuario:', err);
-                setError('No se pudo eliminar el usuario');
-                setDeleteDialog(false);
-              }
-            }} 
-            color="error" 
-            variant="contained"
-            sx={{ 
-              borderRadius: 20,
-              px: 3,
-              boxShadow: 'none'
-            }}
-          >
-            Eliminar
-          </Button>
-        </DialogActions>
-      </Dialog>
+          
+          {/* Sección de estudiantes asociados (solo visible para usuarios tipo ACUDIENTE y cuando no es nuevo) */}
+          {!isNewUser && formik.values.tipo === 'ACUDIENTE' && (
+            <AsociarEstudiantes 
+              acudienteId={id} 
+              estudiantes={estudiantesAsociados}
+              onEstudiantesChange={handleEstudiantesChange}
+            />
+          )}
+        </>
+      )}
     </Box>
   );
 };

@@ -6,6 +6,8 @@ import {
   Typography,
   Paper,
   Button,
+  TextField,
+  InputAdornment,
   Table,
   TableBody,
   TableCell,
@@ -14,32 +16,19 @@ import {
   TableRow,
   IconButton,
   Chip,
-  TextField,
-  InputAdornment,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
+  Grid,
   CircularProgress,
-  LinearProgress,
   Alert,
-  Pagination,
 } from '@mui/material';
 import {
-  Add,
-  Edit,
-  Delete,
-  Visibility,
-  Search,
-  Refresh,
-  FilterList,
+  Search as SearchIcon,
+  Add as AddIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  Visibility as VisibilityIcon,
 } from '@mui/icons-material';
 import axiosInstance from '../../api/axiosConfig';
-import { useSelector } from 'react-redux';
-import { RootState } from '../../redux/store';
 
-// Interfaz para el usuario
 interface Usuario {
   _id: string;
   nombre: string;
@@ -47,147 +36,140 @@ interface Usuario {
   email: string;
   tipo: string;
   estado: string;
-  createdAt: string;
 }
 
-const ListaUsuarios = () => {
+const ListaUsuarios: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useSelector((state: RootState) => state.auth);
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [filteredUsuarios, setFilteredUsuarios] = useState<Usuario[]>([]);
+  const [busqueda, setBusqueda] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState<string>('');
-  const [page, setPage] = useState<number>(1);
-  const [totalPages, setTotalPages] = useState<number>(1);
-  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; userId: string | null }>({
-    open: false,
-    userId: null,
-  });
-  const [refreshKey, setRefreshKey] = useState<number>(0);
-
-  const itemsPerPage = 10;
 
   useEffect(() => {
     cargarUsuarios();
-  }, [page, refreshKey]);
+  }, []);
+
+  useEffect(() => {
+    // Filtramos usuarios cuando cambie la búsqueda
+    if (busqueda.trim() === '') {
+      setFilteredUsuarios(usuarios);
+    } else {
+      const searchTermLower = busqueda.toLowerCase();
+      const filtered = usuarios.filter(
+        (usuario) =>
+          usuario.nombre.toLowerCase().includes(searchTermLower) ||
+          usuario.apellidos.toLowerCase().includes(searchTermLower) ||
+          usuario.email.toLowerCase().includes(searchTermLower) ||
+          usuario.tipo.toLowerCase().includes(searchTermLower)
+      );
+      setFilteredUsuarios(filtered);
+    }
+  }, [busqueda, usuarios]);
 
   const cargarUsuarios = async () => {
     try {
       setLoading(true);
       setError(null);
-
-      // Configurar parámetros para la paginación
-      const params = {
-        page,
-        limit: itemsPerPage,
-        ...(searchTerm && { q: searchTerm }),
-      };
-
-      const response = await axiosInstance.get('/usuarios', { params });
       
-      if (response.data?.success) {
-        setUsuarios(response.data.data);
-        setTotalPages(Math.ceil(response.data.meta?.total / itemsPerPage) || 1);
-      } else {
-        throw new Error('Error al cargar usuarios');
-      }
-    } catch (err: any) {
+      const response = await axiosInstance.get('/usuarios');
+      const data = response.data.data || [];
+      
+      setUsuarios(data);
+      setFilteredUsuarios(data);
+    } catch (err) {
       console.error('Error al cargar usuarios:', err);
-      setError(err.response?.data?.message || 'No se pudieron cargar los usuarios');
+      setError('Error al cargar la lista de usuarios. Intente nuevamente más tarde.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    setPage(1); // Resetear a la primera página al buscar
-    cargarUsuarios();
+  const handleSearch = () => {
+    // La búsqueda ya se aplica automáticamente por el efecto
+    // Este método se mantiene para el botón de búsqueda
+    console.log("Buscando: ", busqueda);
   };
 
-  const handlePageChange = (_event: React.ChangeEvent<unknown>, value: number) => {
-    setPage(value);
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
   };
 
-  const handleRefresh = () => {
-    setRefreshKey(oldKey => oldKey + 1);
+  const handleVerUsuario = (id: string) => {
+    navigate(`/usuarios/${id}`);
   };
 
-  const handleDeleteClick = (userId: string) => {
-    setDeleteDialog({ open: true, userId });
+  const handleEditarUsuario = (id: string) => {
+    navigate(`/usuarios/${id}`);
   };
 
-  const handleDeleteConfirm = async () => {
-    if (!deleteDialog.userId) return;
-    
-    try {
-      setLoading(true);
-      const response = await axiosInstance.delete(`/usuarios/${deleteDialog.userId}`);
-      
-      if (response.data?.success) {
-        // Actualizar la lista de usuarios
-        setUsuarios(usuarios.filter(user => user._id !== deleteDialog.userId));
+  const handleEliminarUsuario = async (id: string) => {
+    if (window.confirm('¿Está seguro de desactivar este usuario?')) {
+      try {
+        await axiosInstance.delete(`/usuarios/${id}`);
+        // Recargar la lista después de eliminar
+        cargarUsuarios();
+      } catch (err) {
+        console.error('Error al eliminar usuario:', err);
+        setError('Error al desactivar usuario. Intente nuevamente más tarde.');
       }
-    } catch (err: any) {
-      console.error('Error al eliminar usuario:', err);
-      setError(err.response?.data?.message || 'No se pudo eliminar el usuario');
-    } finally {
-      setLoading(false);
-      setDeleteDialog({ open: false, userId: null });
     }
   };
 
-  const handleDeleteCancel = () => {
-    setDeleteDialog({ open: false, userId: null });
-  };
-
-  // Obtener etiqueta para el tipo de usuario
-  const getTipoLabel = (tipo: string) => {
+  const getTipoUsuario = (tipo: string) => {
     switch (tipo) {
-      case 'ADMIN': return 'Administrador';
-      case 'DOCENTE': return 'Docente';
-      case 'PADRE': return 'Padre de Familia';
-      case 'ESTUDIANTE': return 'Estudiante';
-      default: return tipo;
+      case 'ADMIN':
+        return 'Administrador';
+      case 'DOCENTE':
+        return 'Docente';
+      case 'ESTUDIANTE':
+        return 'Estudiante';
+      case 'ACUDIENTE':
+        return 'Acudiente';
+      case 'COORDINADOR':
+        return 'Coordinador';
+      case 'RECTOR':
+        return 'Rector';
+      case 'ADMINISTRATIVO':
+        return 'Administrativo';
+      default:
+        return tipo;
     }
   };
 
-  // Obtener color para el chip de estado
   const getEstadoColor = (estado: string) => {
     switch (estado) {
-      case 'ACTIVO': return 'success';
-      case 'INACTIVO': return 'error';
-      default: return 'default';
+      case 'ACTIVO':
+        return 'success';
+      case 'INACTIVO':
+        return 'error';
+      default:
+        return 'default';
     }
-  };
-
-  // Obtener color para el chip de tipo de usuario
-  const getTipoColor = (tipo: string) => {
-    switch (tipo) {
-      case 'ADMIN': return 'secondary';
-      case 'DOCENTE': return 'primary';
-      case 'PADRE': return 'info';
-      case 'ESTUDIANTE': return 'warning';
-      default: return 'default';
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    const options: Intl.DateTimeFormatOptions = { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    };
-    return new Date(dateString).toLocaleDateString('es-ES', options);
   };
 
   return (
     <Box>
-      <Typography variant="h1" color="primary.main" gutterBottom>
-        Administración de Usuarios
-      </Typography>
+      <Grid container spacing={2} alignItems="center" sx={{ mb: 3 }}>
+        <Grid item xs>
+          <Typography variant="h1" color="primary.main">
+            Administración de Usuarios
+          </Typography>
+        </Grid>
+        <Grid item>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => navigate('/usuarios/nuevo')}
+            sx={{ borderRadius: '20px' }}
+          >
+            Nuevo Usuario
+          </Button>
+        </Grid>
+      </Grid>
 
-      {/* Barra de acciones */}
       <Paper
         elevation={0}
         sx={{
@@ -195,278 +177,171 @@ const ListaUsuarios = () => {
           mb: 3,
           borderRadius: 3,
           boxShadow: '0px 4px 4px rgba(0, 0, 0, 0.05)',
-          display: 'flex',
-          flexWrap: 'wrap',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: 2,
         }}
       >
-        <Box component="form" onSubmit={handleSearch} sx={{ display: 'flex', alignItems: 'center', flexGrow: 1, maxWidth: 500 }}>
-          <TextField
-            variant="outlined"
-            size="small"
-            placeholder="Buscar usuarios..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            sx={{ mr: 1, flexGrow: 1 }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Search color="action" />
-                </InputAdornment>
-              ),
-              sx: { borderRadius: 2 }
-            }}
-          />
-          <Button 
-            type="submit" 
-            variant="contained" 
-            color="primary"
-            sx={{ 
-              borderRadius: 20,
-              px: 3,
-              fontWeight: 500,
-              boxShadow: 'none',
-              '&:hover': {
-                boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.1)'
-              }
-            }}
-          >
-            Buscar
-          </Button>
-        </Box>
-
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button
-            variant="outlined"
-            startIcon={<Refresh />}
-            onClick={handleRefresh}
-            sx={{ 
-              borderRadius: 20,
-              borderColor: 'rgba(0, 0, 0, 0.12)',
-              color: 'text.secondary'
-            }}
-          >
-            Actualizar
-          </Button>
-          <Button
-            variant="contained"
-            color="secondary"
-            startIcon={<Add />}
-            onClick={() => navigate('/usuarios/nuevo')}
-            sx={{ 
-              borderRadius: 20,
-              fontWeight: 500,
-              boxShadow: 'none',
-              '&:hover': {
-                boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.1)'
-              }
-            }}
-          >
-            Nuevo Usuario
-          </Button>
-        </Box>
+        <Grid container spacing={2} alignItems="center">
+          <Grid item xs>
+            <TextField
+              fullWidth
+              placeholder="Buscar usuarios por nombre, email o tipo..."
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              onKeyPress={handleKeyPress}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+              }}
+              size="small"
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                },
+              }}
+            />
+          </Grid>
+          <Grid item>
+            <Button
+              variant="outlined"
+              onClick={handleSearch}
+              sx={{ borderRadius: '20px' }}
+            >
+              Buscar
+            </Button>
+          </Grid>
+        </Grid>
       </Paper>
 
-      {/* Tabla de usuarios */}
-      {loading && usuarios.length === 0 ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', my: 5 }}>
-          <CircularProgress />
-        </Box>
-      ) : error ? (
-        <Alert 
-          severity="error" 
-          sx={{ 
+      {error && (
+        <Alert
+          severity="error"
+          sx={{
             mb: 3,
             borderRadius: 2,
             '& .MuiAlert-message': {
-              fontWeight: 500
-            }
+              fontWeight: 500,
+            },
           }}
         >
           {error}
         </Alert>
-      ) : (
-        <Paper
-          elevation={0}
-          sx={{
-            borderRadius: 3,
-            overflow: 'hidden',
-            boxShadow: '0px 4px 4px rgba(0, 0, 0, 0.05)',
-          }}
-        >
-          <TableContainer>
-            <Table sx={{ minWidth: 650 }}>
-              <TableHead sx={{ bgcolor: 'primary.main' }}>
-                <TableRow>
-                  <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Nombre</TableCell>
-                  <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Email</TableCell>
-                  <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Tipo</TableCell>
-                  <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Estado</TableCell>
-                  <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Fecha Registro</TableCell>
-                  <TableCell align="center" sx={{ color: 'white', fontWeight: 'bold' }}>Acciones</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {usuarios.length > 0 ? (
-                  usuarios.map((usuario) => (
-                    <TableRow
-                      key={usuario._id}
-                      sx={{
-                        '&:hover': { bgcolor: 'rgba(93, 169, 233, 0.08)' },
-                        borderBottom: '1px solid rgba(0, 0, 0, 0.12)',
-                      }}
-                    >
-                      <TableCell sx={{ fontWeight: 500 }}>
-                        {usuario.nombre} {usuario.apellidos}
-                      </TableCell>
-                      <TableCell>{usuario.email}</TableCell>
-                      <TableCell>
-                        <Chip
-                          label={getTipoLabel(usuario.tipo)}
-                          color={getTipoColor(usuario.tipo) as any}
-                          size="small"
-                          sx={{ 
-                            fontWeight: 'bold', 
-                            borderRadius: 8 
-                          }}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={usuario.estado}
-                          color={getEstadoColor(usuario.estado) as any}
-                          size="small"
-                          sx={{ 
-                            fontWeight: 'bold', 
-                            borderRadius: 8 
-                          }}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        {usuario.createdAt ? formatDate(usuario.createdAt) : 'N/A'}
-                      </TableCell>
-                      <TableCell align="center">
-                        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1 }}>
-                          <IconButton
-                            size="small"
-                            color="primary"
-                            onClick={() => navigate(`/usuarios/${usuario._id}`)}
-                            sx={{ 
-                              bgcolor: 'rgba(93, 169, 233, 0.1)',
-                              '&:hover': { bgcolor: 'rgba(93, 169, 233, 0.2)' }
-                            }}
-                          >
-                            <Visibility fontSize="small" />
-                          </IconButton>
-                          <IconButton
-                            size="small"
-                            color="secondary"
-                            onClick={() => navigate(`/usuarios/editar/${usuario._id}`)}
-                            sx={{ 
-                              bgcolor: 'rgba(0, 63, 145, 0.1)',
-                              '&:hover': { bgcolor: 'rgba(0, 63, 145, 0.2)' }
-                            }}
-                          >
-                            <Edit fontSize="small" />
-                          </IconButton>
-                          {user?._id !== usuario._id && (
-                            <IconButton
-                              size="small"
-                              color="error"
-                              onClick={() => handleDeleteClick(usuario._id)}
-                              sx={{ 
-                                bgcolor: 'rgba(244, 67, 54, 0.1)',
-                                '&:hover': { bgcolor: 'rgba(244, 67, 54, 0.2)' }
-                              }}
-                            >
-                              <Delete fontSize="small" />
-                            </IconButton>
-                          )}
-                        </Box>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
-                      <Typography variant="body1" color="text.secondary">
-                        No se encontraron usuarios
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                )}
-                {loading && usuarios.length > 0 && (
-                  <TableRow>
-                    <TableCell colSpan={6} sx={{ p: 0, borderBottom: 'none' }}>
-                      <LinearProgress />
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-          
-          {/* Paginación */}
-          <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
-            <Pagination
-              count={totalPages}
-              page={page}
-              onChange={handlePageChange}
-              color="primary"
-              sx={{
-                '& .MuiPaginationItem-root': {
-                  borderRadius: 8,
-                }
-              }}
-            />
-          </Box>
-        </Paper>
       )}
 
-      {/* Diálogo de confirmación para eliminar usuario */}
-      <Dialog
-        open={deleteDialog.open}
-        onClose={handleDeleteCancel}
-        PaperProps={{
-          sx: {
-            borderRadius: 3,
-            boxShadow: '0px 8px 24px rgba(0, 0, 0, 0.15)',
-          }
+      <TableContainer
+        component={Paper}
+        elevation={0}
+        sx={{
+          boxShadow: '0px 4px 4px rgba(0, 0, 0, 0.05)',
+          borderRadius: 3,
+          overflow: 'hidden',
         }}
       >
-        <DialogTitle>Confirmar eliminación</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            ¿Está seguro que desea desactivar este usuario? Esta acción no se puede deshacer.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions sx={{ p: 2, pt: 0 }}>
-          <Button 
-            onClick={handleDeleteCancel} 
-            color="inherit"
-            sx={{ 
-              borderRadius: 20,
-              px: 3
-            }}
-          >
-            Cancelar
-          </Button>
-          <Button 
-            onClick={handleDeleteConfirm} 
-            color="error" 
-            variant="contained"
-            sx={{ 
-              borderRadius: 20,
-              px: 3,
-              boxShadow: 'none'
-            }}
-          >
-            Eliminar
-          </Button>
-        </DialogActions>
-      </Dialog>
+        <Table>
+          <TableHead sx={{ bgcolor: 'primary.main' }}>
+            <TableRow>
+              <TableCell sx={{ color: 'white', fontWeight: 600 }}>Nombre</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 600 }}>Email</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 600 }}>Tipo</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 600 }}>Estado</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 600 }} align="center">
+                Acciones
+              </TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
+                  <CircularProgress />
+                </TableCell>
+              </TableRow>
+            ) : filteredUsuarios.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
+                  No se encontraron usuarios
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredUsuarios.map((usuario) => (
+                <TableRow
+                  key={usuario._id}
+                  sx={{
+                    '&:hover': {
+                      bgcolor: 'rgba(93, 169, 233, 0.05)',
+                    },
+                  }}
+                >
+                  <TableCell sx={{ fontWeight: 500 }}>
+                    {usuario.nombre} {usuario.apellidos}
+                  </TableCell>
+                  <TableCell>{usuario.email}</TableCell>
+                  <TableCell>
+                    <Chip
+                      label={getTipoUsuario(usuario.tipo)}
+                      color="primary"
+                      variant="outlined"
+                      size="small"
+                      sx={{ fontWeight: 500, borderRadius: 10 }}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      label={usuario.estado}
+                      color={getEstadoColor(usuario.estado) as any}
+                      size="small"
+                      sx={{ fontWeight: 500, borderRadius: 10 }}
+                    />
+                  </TableCell>
+                  <TableCell align="center">
+                    <IconButton
+                      color="primary"
+                      onClick={() => handleVerUsuario(usuario._id)}
+                      sx={{
+                        mr: 1,
+                        bgcolor: 'rgba(93, 169, 233, 0.1)',
+                        '&:hover': {
+                          bgcolor: 'rgba(93, 169, 233, 0.2)',
+                        },
+                      }}
+                    >
+                      <VisibilityIcon />
+                    </IconButton>
+                    <IconButton
+                      color="secondary"
+                      onClick={() => handleEditarUsuario(usuario._id)}
+                      sx={{
+                        mr: 1,
+                        bgcolor: 'rgba(0, 63, 145, 0.1)',
+                        '&:hover': {
+                          bgcolor: 'rgba(0, 63, 145, 0.2)',
+                        },
+                      }}
+                    >
+                      <EditIcon />
+                    </IconButton>
+                    {usuario.estado === 'ACTIVO' && (
+                      <IconButton
+                        color="error"
+                        onClick={() => handleEliminarUsuario(usuario._id)}
+                        sx={{
+                          bgcolor: 'rgba(244, 67, 54, 0.1)',
+                          '&:hover': {
+                            bgcolor: 'rgba(244, 67, 54, 0.2)',
+                          },
+                        }}
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
     </Box>
   );
 };

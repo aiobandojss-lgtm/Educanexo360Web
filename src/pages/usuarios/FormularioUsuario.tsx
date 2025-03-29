@@ -21,6 +21,11 @@ import {
   IconButton,
   Card,
   CardContent,
+  InputAdornment,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemSecondaryAction,
 } from '@mui/material';
 import {
   ArrowBack,
@@ -28,13 +33,26 @@ import {
   Cancel,
   Visibility,
   VisibilityOff,
+  Phone,
+  PersonRemove,
+  Search,
 } from '@mui/icons-material';
 import axiosInstance from '../../api/axiosConfig';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../redux/store';
 
 // Interfaces
 interface Escuela {
   _id: string;
   nombre: string;
+}
+
+interface Estudiante {
+  _id: string;
+  nombre: string;
+  apellidos: string;
+  email: string;
+  tipo: string;
 }
 
 interface FormValues {
@@ -46,11 +64,18 @@ interface FormValues {
   tipo: string;
   estado: string;
   escuelaId: string;
+  perfil: {
+    telefono?: string;
+  };
+  info_academica?: {
+    estudiantes_asociados?: string[];
+  };
 }
 
 const FormularioUsuario = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useSelector((state: RootState) => state.auth);
   const [usuario, setUsuario] = useState<any>(null);
   const [escuelas, setEscuelas] = useState<Escuela[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -59,7 +84,17 @@ const FormularioUsuario = () => {
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
   const isEditMode = Boolean(id);
-
+  const [telefono, setTelefono] = useState("");
+  
+  // Nuevos estados para la asociación de estudiantes
+  const [estudiantes, setEstudiantes] = useState<Estudiante[]>([]);
+  const [estudiantesSeleccionados, setEstudiantesSeleccionados] = useState<Estudiante[]>([]);
+  const [loadingEstudiantes, setLoadingEstudiantes] = useState<boolean>(false);
+  const [busquedaEstudiante, setBusquedaEstudiante] = useState<string>("");
+  
+  // Determinar si el usuario actual es super admin
+  const isSuperAdmin = user?.tipo === 'SUPER_ADMIN';
+  
   // Esquema de validación
   const validationSchema = Yup.object({
     nombre: Yup.string().required('El nombre es requerido'),
@@ -80,6 +115,9 @@ const FormularioUsuario = () => {
     tipo: Yup.string().required('El tipo de usuario es requerido'),
     estado: Yup.string().required('El estado es requerido'),
     escuelaId: Yup.string().required('La escuela es requerida'),
+    perfil: Yup.object().shape({
+      telefono: Yup.string().max(20, 'El teléfono no puede tener más de 20 caracteres')
+    })
   });
 
   // Valores iniciales para el formulario
@@ -89,9 +127,40 @@ const FormularioUsuario = () => {
     email: '',
     password: '',
     confirmPassword: '',
-    tipo: 'ESTUDIANTE', // Valor por defecto
-    estado: 'ACTIVO', // Valor por defecto
-    escuelaId: '',
+    tipo: 'ESTUDIANTE',
+    estado: 'ACTIVO',
+    escuelaId: user?.escuelaId || '', // Por defecto, asignar la escuela del usuario actual
+    perfil: {
+      telefono: ''
+    },
+    info_academica: {
+      estudiantes_asociados: []
+    }
+  };
+
+  // Función para cargar estudiantes
+  const cargarEstudiantes = async (query: string = "") => {
+    try {
+      setLoadingEstudiantes(true);
+      console.log("[DEBUG] Cargando estudiantes con query:", query);
+      
+      // Construir URL con parámetros de búsqueda
+      let url = '/usuarios?tipo=ESTUDIANTE&estado=ACTIVO';
+      if (query) {
+        url += `&busqueda=${encodeURIComponent(query)}`;
+      }
+      
+      const response = await axiosInstance.get(url);
+      
+      if (response.data?.success) {
+        console.log("[DEBUG] Estudiantes cargados:", response.data.data.length);
+        setEstudiantes(response.data.data || []);
+      }
+    } catch (err) {
+      console.error('Error al cargar estudiantes:', err);
+    } finally {
+      setLoadingEstudiantes(false);
+    }
   };
 
   useEffect(() => {
@@ -100,15 +169,62 @@ const FormularioUsuario = () => {
         setLoading(true);
         setError(null);
 
-        // Cargar escuelas
-        const escuelasResponse = await axiosInstance.get('/escuelas');
-        setEscuelas(escuelasResponse.data.data || []);
+        // Cargar escuelas según permisos
+        if (isSuperAdmin) {
+          // Si es super admin, cargar todas las escuelas
+          const escuelasResponse = await axiosInstance.get('/escuelas');
+          setEscuelas(escuelasResponse.data.data || []);
+        } else if (user?.escuelaId) {
+          // Si no es super admin, cargar solo su escuela
+          try {
+            const escuelaResponse = await axiosInstance.get(`/escuelas/${user.escuelaId}`);
+            if (escuelaResponse.data?.success) {
+              setEscuelas([escuelaResponse.data.data]);
+            }
+          } catch (error) {
+            // Si falla, al menos tener el ID disponible
+            setEscuelas([{ _id: user.escuelaId, nombre: 'Tu escuela' }]);
+          }
+        }
 
         // Si estamos en modo edición, cargar datos del usuario
         if (isEditMode && id) {
           const usuarioResponse = await axiosInstance.get(`/usuarios/${id}`);
           if (usuarioResponse.data?.success) {
-            setUsuario(usuarioResponse.data.data);
+            const userData = usuarioResponse.data.data;
+            setUsuario(userData);
+            
+            if (userData.perfil?.telefono) {
+              setTelefono(userData.perfil.telefono);
+            }
+            
+            // Si es un acudiente, cargar los estudiantes asociados
+            if (userData.tipo === 'ACUDIENTE' && userData.info_academica?.estudiantes_asociados) {
+              try {
+                const estudiantesIds = userData.info_academica.estudiantes_asociados;
+                console.log("[DEBUG] Cargando estudiantes asociados:", estudiantesIds);
+                
+                if (estudiantesIds && estudiantesIds.length > 0) {
+                  // Cargar detalles de los estudiantes asociados
+                  const promesas = estudiantesIds.map((estId: string) => 
+                    axiosInstance.get(`/usuarios/${estId}`)
+                  );
+                  
+                  const resultados = await Promise.all(promesas);
+                  const estudiantesData = resultados
+                    .filter(res => res.data && res.data.success)
+                    .map(res => res.data.data);
+                  
+                  console.log("[DEBUG] Estudiantes asociados cargados:", estudiantesData.length);
+                  setEstudiantesSeleccionados(estudiantesData);
+                }
+                
+                // También cargar posibles estudiantes para asociar
+                cargarEstudiantes();
+              } catch (err) {
+                console.error('Error al cargar estudiantes asociados:', err);
+              }
+            }
           }
         }
       } catch (err: any) {
@@ -122,33 +238,107 @@ const FormularioUsuario = () => {
     };
 
     cargarDatos();
-  }, [id, isEditMode]);
+  }, [id, isEditMode, user?.escuelaId, isSuperAdmin]);
+
+  // Función para agregar estudiante a la lista
+  const agregarEstudiante = (estudiante: Estudiante) => {
+    // Verificar si ya está seleccionado
+    const yaSeleccionado = estudiantesSeleccionados.some(e => e._id === estudiante._id);
+    
+    if (!yaSeleccionado) {
+      console.log("[DEBUG] Agregando estudiante:", estudiante.nombre, estudiante.apellidos);
+      setEstudiantesSeleccionados([...estudiantesSeleccionados, estudiante]);
+    }
+  };
+  
+  // Función para eliminar estudiante de la lista
+  const eliminarEstudiante = (estudianteId: string) => {
+    console.log("[DEBUG] Eliminando estudiante con ID:", estudianteId);
+    setEstudiantesSeleccionados(estudiantesSeleccionados.filter(e => e._id !== estudianteId));
+  };
+
+  // Función para buscar estudiantes
+  const buscarEstudiantes = () => {
+    console.log("[DEBUG] Buscando estudiantes con término:", busquedaEstudiante);
+    cargarEstudiantes(busquedaEstudiante);
+  };
 
   const handleSubmit = async (values: FormValues, { setSubmitting }: any) => {
     try {
       setSubmitting(true);
-      setSubmitting(true);
       setError(null);
-
-      // Si no hay cambios en la contraseña en modo edición, eliminarla de los datos a enviar
-      if (isEditMode && !values.password) {
-        const { password, confirmPassword, ...dataToSend } = values;
+      
+      // Asegurar que se asigne la escuela del usuario actual si no es super admin
+      if (!isSuperAdmin) {
+        values.escuelaId = user?.escuelaId || values.escuelaId;
+      }
+  
+      // Si es acudiente, añadir los estudiantes seleccionados
+      if (values.tipo === 'ACUDIENTE') {
+        console.log("[DEBUG] Guardando acudiente con estudiantes:", estudiantesSeleccionados.map(e => e._id));
         
-        // Actualizar usuario
-        await axiosInstance.put(`/usuarios/${id}`, dataToSend);
-      } else {
-        // Para nueva creación o actualización con contraseña
-        const { confirmPassword, ...dataToSend } = values;
+        // Crear objeto con la información completa
+        const dataToSend = {
+          ...values,
+          info_academica: {
+            estudiantes_asociados: estudiantesSeleccionados.map(e => e._id)
+          },
+          perfil: {
+            telefono: telefono
+          }
+        };
         
+        // Eliminar campos que no deben enviarse
+        if (isEditMode && !values.password) {
+          // En lugar de usar delete, crear un objeto nuevo omitiendo las propiedades
+          const { password, confirmPassword, ...dataSinPassword } = dataToSend;
+          
+          // Guardar
+          if (isEditMode) {
+            await axiosInstance.put(`/usuarios/${id}`, dataSinPassword);
+          } else {
+            await axiosInstance.post('/auth/register', dataSinPassword);
+          }
+        } else {
+          // Omitir solo confirmPassword
+          const { confirmPassword, ...dataSinConfirm } = dataToSend;
+          
+          // Guardar
+          if (isEditMode) {
+            await axiosInstance.put(`/usuarios/${id}`, dataSinConfirm);
+          } else {
+            await axiosInstance.post('/auth/register', dataSinConfirm);
+          }
+        }
+        
+        // Guardar
         if (isEditMode) {
           await axiosInstance.put(`/usuarios/${id}`, dataToSend);
         } else {
-          // Crear nuevo usuario - usar la ruta de registro para nuevos usuarios
           await axiosInstance.post('/auth/register', dataToSend);
         }
+      } else {
+        // Código normal para otros tipos de usuario
+        const dataWithPhone = {
+          ...values,
+          perfil: {
+            telefono: telefono
+          }
+        };
+      
+        if (isEditMode && !values.password) {
+          const { password, confirmPassword, ...dataToSend } = dataWithPhone;
+          await axiosInstance.put(`/usuarios/${id}`, dataToSend);
+        } else {
+          const { confirmPassword, ...dataToSend } = dataWithPhone;
+          if (isEditMode) {
+            await axiosInstance.put(`/usuarios/${id}`, dataToSend);
+          } else {
+            await axiosInstance.post('/auth/register', dataToSend);
+          }
+        }
       }
-
-      // Redireccionar a la lista de usuarios con mensaje de éxito
+  
       navigate('/usuarios', {
         state: {
           message: isEditMode
@@ -176,14 +366,20 @@ const FormularioUsuario = () => {
 
   // Preparar valores iniciales para el formulario cuando estamos en modo edición
   const formValues = isEditMode && usuario
-    ? {
-        ...initialValues,
-        ...usuario,
-        password: '', // No mostrar contraseña en modo edición
-        confirmPassword: '',
-        escuelaId: usuario.escuelaId?._id || usuario.escuelaId,
-      }
-    : initialValues;
+  ? {
+      ...initialValues,
+      ...usuario,
+      password: '',
+      confirmPassword: '',
+      escuelaId: usuario.escuelaId?._id || usuario.escuelaId,
+      perfil: {
+        telefono: usuario.perfil?.telefono || ''
+      },
+      info_academica: usuario.info_academica || { estudiantes_asociados: [] }
+    }
+  : initialValues;
+
+  console.log("TIPO DE USUARIO EN FORMULARIO:", formValues.tipo);
 
   return (
     <Box>
@@ -244,7 +440,7 @@ const FormularioUsuario = () => {
           onSubmit={handleSubmit}
           enableReinitialize
         >
-          {({ errors, touched, isSubmitting, values, handleChange, handleBlur }) => (
+          {({ errors, touched, isSubmitting, values, handleChange, handleBlur, setFieldValue }) => (
             <Form>
               <Box sx={{ p: 3 }}>
                 <Grid container spacing={3}>
@@ -286,7 +482,7 @@ const FormularioUsuario = () => {
                     />
                   </Grid>
 
-                  <Grid item xs={12}>
+                  <Grid item xs={12} sm={6}>
                     <Field
                       as={TextField}
                       name="email"
@@ -296,6 +492,25 @@ const FormularioUsuario = () => {
                       error={touched.email && Boolean(errors.email)}
                       helperText={touched.email && errors.email}
                       InputProps={{
+                        sx: { borderRadius: 2 }
+                      }}
+                    />
+                  </Grid>
+                  
+                  {/* Nuevo campo de teléfono */}
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      label="Teléfono"
+                      fullWidth
+                      variant="outlined"
+                      value={telefono}
+                      onChange={(e) => setTelefono(e.target.value)}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <Phone />
+                          </InputAdornment>
+                        ),
                         sx: { borderRadius: 2 }
                       }}
                     />
@@ -386,15 +601,31 @@ const FormularioUsuario = () => {
                         id="tipo"
                         name="tipo"
                         value={values.tipo}
-                        onChange={handleChange}
+                        onChange={(e) => {
+                          // Cambiar el tipo en el formulario
+                          handleChange(e);
+                          
+                          // Si cambia a acudiente, cargar estudiantes
+                          if (e.target.value === 'ACUDIENTE') {
+                            console.log("[DEBUG] Tipo cambiado a ACUDIENTE, cargando estudiantes...");
+                            setTimeout(() => cargarEstudiantes(), 100);
+                          }
+                        }}
                         onBlur={handleBlur}
                         label="Tipo de Usuario"
                         sx={{ borderRadius: 2 }}
                       >
+                        {/* Mostrar SUPER_ADMIN solo si el usuario actual es SUPER_ADMIN */}
+                        {isSuperAdmin && (
+                          <MenuItem value="SUPER_ADMIN">Super Administrador</MenuItem>
+                        )}
                         <MenuItem value="ADMIN">Administrador</MenuItem>
                         <MenuItem value="DOCENTE">Docente</MenuItem>
-                        <MenuItem value="PADRE">Padre de Familia</MenuItem>
+                        <MenuItem value="ACUDIENTE">Acudiente</MenuItem> {/* Cambiado de PADRE a ACUDIENTE */}
                         <MenuItem value="ESTUDIANTE">Estudiante</MenuItem>
+                        <MenuItem value="COORDINADOR">Coordinador</MenuItem> {/* Nuevo rol */}
+                        <MenuItem value="RECTOR">Rector</MenuItem> {/* Nuevo rol */}
+                        <MenuItem value="ADMINISTRATIVO">Administrativo</MenuItem> {/* Nuevo rol */}
                       </Select>
                       <FormHelperText>{touched.tipo && errors.tipo}</FormHelperText>
                     </FormControl>
@@ -425,31 +656,174 @@ const FormularioUsuario = () => {
                   </Grid>
 
                   <Grid item xs={12}>
-                    <FormControl
-                      fullWidth
-                      error={touched.escuelaId && Boolean(errors.escuelaId)}
-                      variant="outlined"
-                    >
-                      <InputLabel id="escuela-label">Escuela</InputLabel>
-                      <Select
-                        labelId="escuela-label"
-                        id="escuelaId"
-                        name="escuelaId"
-                        value={values.escuelaId}
-                        onChange={handleChange}
-                        onBlur={handleBlur}
-                        label="Escuela"
-                        sx={{ borderRadius: 2 }}
+                    {isSuperAdmin ? (
+                      // Si es super admin, mostrar selector de escuelas
+                      <FormControl
+                        fullWidth
+                        error={touched.escuelaId && Boolean(errors.escuelaId)}
+                        variant="outlined"
                       >
-                        {escuelas.map((escuela) => (
-                          <MenuItem key={escuela._id} value={escuela._id}>
-                            {escuela.nombre}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                      <FormHelperText>{touched.escuelaId && errors.escuelaId}</FormHelperText>
-                    </FormControl>
+                        <InputLabel id="escuela-label">Escuela</InputLabel>
+                        <Select
+                          labelId="escuela-label"
+                          id="escuelaId"
+                          name="escuelaId"
+                          value={values.escuelaId}
+                          onChange={handleChange}
+                          onBlur={handleBlur}
+                          label="Escuela"
+                          sx={{ borderRadius: 2 }}
+                        >
+                          {escuelas.map((escuela) => (
+                            <MenuItem key={escuela._id} value={escuela._id}>
+                              {escuela.nombre}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                        <FormHelperText>{touched.escuelaId && errors.escuelaId}</FormHelperText>
+                      </FormControl>
+                    ) : (
+                      // Si no es super admin, mostrar campo de solo lectura y establecer el valor
+                      <>
+                        <TextField
+                          fullWidth
+                          label="Escuela"
+                          value={escuelas.length > 0 ? escuelas[0].nombre : 'Tu escuela'}
+                          disabled
+                          variant="outlined"
+                          sx={{ mb: 1 }}
+                          InputProps={{
+                            readOnly: true,
+                            sx: { borderRadius: 2 }
+                          }}
+                        />
+                        <input 
+                          type="hidden" 
+                          name="escuelaId" 
+                          value={user?.escuelaId || values.escuelaId} 
+                        />
+                        <Typography variant="caption" color="text.secondary">
+                          Los usuarios se crearán automáticamente en tu escuela
+                        </Typography>
+                      </>
+                    )}
                   </Grid>
+
+                  {/* SECCIÓN DE ESTUDIANTES ASOCIADOS - SOLO PARA ACUDIENTES */}
+                  {formValues.tipo === 'ACUDIENTE' && (
+                    <Grid item xs={12}>
+                      <Box sx={{ 
+                        mt: 4, 
+                        p: 3, 
+                        bgcolor: '#f0f7ff', 
+                        borderRadius: 3,
+                        border: '2px solid #3f51b5'
+                      }}>
+                        <Typography variant="h3" color="primary.main" gutterBottom>
+                          Estudiantes Asociados
+                        </Typography>
+                        <Typography variant="body1" paragraph>
+                          Seleccione los estudiantes que estarán asociados a este acudiente.
+                          Esta información es crucial para el sistema de mensajería.
+                        </Typography>
+                        
+                        {/* Buscador de estudiantes */}
+                        <Box sx={{ display: 'flex', mb: 3, mt: 2 }}>
+                          <TextField
+                            fullWidth
+                            label="Buscar estudiante"
+                            variant="outlined"
+                            placeholder="Nombre, apellido o email"
+                            value={busquedaEstudiante}
+                            onChange={(e) => setBusquedaEstudiante(e.target.value)}
+                            InputProps={{
+                              startAdornment: (
+                                <InputAdornment position="start">
+                                  <Search />
+                                </InputAdornment>
+                              ),
+                              sx: { borderRadius: 2 }
+                            }}
+                            sx={{ mr: 1 }}
+                          />
+                          <Button 
+                            variant="contained" 
+                            onClick={buscarEstudiantes}
+                            disabled={loadingEstudiantes}
+                            sx={{ minWidth: '120px', borderRadius: 2 }}
+                          >
+                            {loadingEstudiantes ? <CircularProgress size={24} /> : "Buscar"}
+                          </Button>
+                        </Box>
+                        
+                        {/* Resultados de búsqueda */}
+                        {estudiantes.length > 0 && (
+                          <Box sx={{ mb: 3 }}>
+                            <Typography variant="h6" gutterBottom>
+                              Resultados de búsqueda ({estudiantes.length}):
+                            </Typography>
+                            <Paper variant="outlined" sx={{ maxHeight: '300px', overflow: 'auto' }}>
+                              <List dense>
+                                {estudiantes.map((estudiante) => (
+                                  <ListItem key={estudiante._id} divider>
+                                    <ListItemText
+                                      primary={`${estudiante.nombre} ${estudiante.apellidos}`}
+                                      secondary={estudiante.email}
+                                    />
+                                    <Button
+                                      variant="outlined"
+                                      color="primary"
+                                      onClick={() => agregarEstudiante(estudiante)}
+                                      size="small"
+                                      sx={{ borderRadius: 2 }}
+                                    >
+                                      Asociar
+                                    </Button>
+                                  </ListItem>
+                                ))}
+                              </List>
+                            </Paper>
+                          </Box>
+                        )}
+                        
+                        {/* Lista de estudiantes asociados */}
+                        <Box>
+                          <Typography variant="h6" gutterBottom>
+                            Estudiantes asociados a este acudiente:
+                          </Typography>
+                          
+                          {estudiantesSeleccionados.length === 0 ? (
+                            <Alert severity="info" sx={{ borderRadius: 2 }}>
+                              No hay estudiantes asociados a este acudiente. Utilice el buscador para añadir estudiantes.
+                            </Alert>
+                          ) : (
+                            <Paper variant="outlined" sx={{ maxHeight: '300px', overflow: 'auto' }}>
+                              <List dense>
+                                {estudiantesSeleccionados.map((estudiante) => (
+                                  <ListItem key={estudiante._id} divider>
+                                    <ListItemText
+                                      primary={`${estudiante.nombre} ${estudiante.apellidos}`}
+                                      secondary={estudiante.email}
+                                    />
+                                    <ListItemSecondaryAction>
+                                      <IconButton 
+                                        edge="end" 
+                                        aria-label="delete" 
+                                        onClick={() => eliminarEstudiante(estudiante._id)}
+                                        color="error"
+                                      >
+                                        <PersonRemove />
+                                      </IconButton>
+                                    </ListItemSecondaryAction>
+                                  </ListItem>
+                                ))}
+                              </List>
+                            </Paper>
+                          )}
+                        </Box>
+                      </Box>
+                    </Grid>
+                  )}
 
                   {/* Botones de acción */}
                   <Grid item xs={12}>

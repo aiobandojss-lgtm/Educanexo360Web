@@ -1,644 +1,349 @@
 // src/components/layout/NavigationMenu.tsx
-import React, { useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import {
+  Box,
   List,
+  ListItem,
   ListItemButton,
   ListItemIcon,
   ListItemText,
-  Collapse,
   Divider,
-  Box,
+  Collapse,
   Typography,
-  Badge,
+  IconButton,
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
+  Message as MessageIcon,
   School as SchoolIcon,
-  Group as GroupIcon,
-  MessageOutlined as MessageIcon,
-  Grading as GradingIcon,
-  Book as BookIcon,
-  BarChart as BarChartIcon,
+  Group as UsersIcon,
   Settings as SettingsIcon,
-  Star as StarIcon,
+  Person as PersonIcon,
+  MenuBook as CursosIcon,
   ExpandLess,
   ExpandMore,
-  Inbox as InboxIcon,
-  Send as SendIcon,
-  Drafts as DraftsIcon,
-  Archive as ArchiveIcon,
-  Person as PersonIcon,
+  CalendarMonth as CalendarIcon,
+  HowToReg as AsistenciaIcon,
+  Delete as DeleteIcon, // Ícono para mensajes eliminados
+  Send as SendIcon, // Ícono para mensajes enviados
+  Inbox as InboxIcon, // Ícono para mensajes recibidos
+  Create as CreateIcon, // Ícono para nuevo mensaje
+  Edit as EditIcon, // Ícono para mensajes borradores
+  Announcement as AnnouncementIcon,
 } from '@mui/icons-material';
 import { RootState } from '../../redux/store';
+import { Archive as ArchiveIcon } from '@mui/icons-material';
 
-const NavigationMenu = () => {
-  const location = useLocation();
+interface NavigationItem {
+  title: string;
+  icon: React.ReactNode;
+  path: string;
+  allowedRoles: string[];
+  children?: NavigationItem[];
+}
+
+const NavigationMenu: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useSelector((state: RootState) => state.auth);
-  
-  // Estados para los menús desplegables
-  const [openMensajes, setOpenMensajes] = useState(location.pathname.includes('/mensajes'));
-  const [openCalificaciones, setOpenCalificaciones] = useState(location.pathname.includes('/calificaciones'));
-  const [openCursos, setOpenCursos] = useState(location.pathname.includes('/cursos'));
-  const [openUsuarios, setOpenUsuarios] = useState(location.pathname.includes('/usuarios'));
+  const location = useLocation();
+  const user = useSelector((state: RootState) => state.auth.user);
+  const [open, setOpen] = useState<{ [key: string]: boolean }>({});
 
-  // Funciones para manejar la navegación
-  const handleNavigate = (path: string) => {
+  const handleClick = (path: string) => {
     navigate(path);
   };
 
-  // Funciones para alternar los menús desplegables
-  const handleToggleMensajes = () => {
-    setOpenMensajes(!openMensajes);
+  const handleToggle = (title: string, event: React.MouseEvent) => {
+    // Detener la propagación para evitar que el evento llegue al ListItemButton
+    event.stopPropagation();
+    
+    setOpen((prevOpen) => ({
+      ...prevOpen,
+      [title]: !prevOpen[title],
+    }));
   };
 
-  const handleToggleCalificaciones = () => {
-    setOpenCalificaciones(!openCalificaciones);
-  };
+  // Configuración del menú
+  const menuItems: NavigationItem[] = [
+    {
+      title: 'Dashboard',
+      icon: <DashboardIcon />,
+      path: '/',
+      allowedRoles: ['ADMIN', 'DOCENTE', 'ESTUDIANTE', 'PADRE', 'ACUDIENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO'],
+    },
+    {
+      title: 'Mensajería',
+      icon: <MessageIcon />,
+      path: '/mensajes',
+      allowedRoles: ['ADMIN', 'DOCENTE', 'ESTUDIANTE', 'PADRE', 'ACUDIENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO'],
+      children: [
+        {
+          title: 'Recibidos',
+          icon: <InboxIcon />,
+          path: '/mensajes/recibidos',
+          allowedRoles: ['ADMIN', 'DOCENTE', 'ESTUDIANTE', 'PADRE', 'ACUDIENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO'],
+        },
+        {
+          title: 'Enviados',
+          icon: <SendIcon />,
+          path: '/mensajes/enviados',
+          // Excluimos ESTUDIANTE de los roles que pueden ver "Enviados"
+          allowedRoles: ['ADMIN', 'DOCENTE', 'PADRE', 'ACUDIENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO'],
+        },
+        {
+          title: 'Borradores',
+          icon: <EditIcon />,
+          path: '/mensajes/borradores',
+          // Solo los roles con permiso para usar borradores
+          allowedRoles: ['ADMIN', 'DOCENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO'],
+        },
+        {
+          title: 'Archivados',
+          icon: <ArchiveIcon />, // Asegúrate de importar ArchiveIcon
+          path: '/mensajes/archivados',
+          // Incluimos ESTUDIANTE en los roles que pueden ver "Archivados"
+          allowedRoles: ['ADMIN', 'DOCENTE', 'ESTUDIANTE', 'PADRE', 'ACUDIENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO'],
+        },
+        {
+          title: 'Nuevo Mensaje',
+          icon: <CreateIcon />,
+          path: '/mensajes/nuevo',
+          // Excluimos ESTUDIANTE de los roles que pueden crear "Nuevo Mensaje"
+          allowedRoles: ['ADMIN', 'DOCENTE', 'PADRE', 'ACUDIENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO'],
+        },
+        {
+          title: 'Eliminados',
+          icon: <DeleteIcon />,
+          path: '/mensajes/eliminados',
+          allowedRoles: ['ADMIN', 'DOCENTE', 'ESTUDIANTE', 'PADRE', 'ACUDIENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO'],
+        },
+      ],
+    },
+    {
+      title: 'Usuarios',
+      icon: <UsersIcon />,
+      path: '/usuarios',
+      // Eliminamos 'ADMINISTRATIVO' de los roles permitidos para ver Usuarios
+      allowedRoles: ['ADMIN', 'COORDINADOR', 'RECTOR'],
+    },
+    {
+      title: 'Cursos',
+      icon: <CursosIcon />,
+      path: '/cursos',
+      allowedRoles: ['ADMIN', 'DOCENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO'],
+    },
+    // Nuevo ítem de menú para Asistencia
+    {
+      title: 'Asistencia',
+      icon: <AsistenciaIcon />,
+      path: '/asistencia',
+      allowedRoles: ['ADMIN', 'DOCENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO'],
+      children: [
+        {
+          title: 'Lista de Registros',
+          icon: <AsistenciaIcon />,
+          path: '/asistencia',
+          allowedRoles: ['ADMIN', 'DOCENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO'],
+        },
+        {
+          title: 'Nuevo Registro',
+          icon: <AsistenciaIcon />,
+          path: '/asistencia/registro',
+          allowedRoles: ['ADMIN', 'DOCENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO'],
+        },
+      ],
+    },
+    {
+      title: 'Calendario Escolar',
+      icon: <CalendarIcon />,
+      path: '/calendario',
+      allowedRoles: ['ADMIN', 'DOCENTE', 'ESTUDIANTE', 'PADRE', 'ACUDIENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO'],
+    },
+    {
+      title: 'Tablero de Anuncios',
+      icon: <AnnouncementIcon />,
+      path: '/anuncios',
+      allowedRoles: ['ADMIN', 'DOCENTE', 'ESTUDIANTE', 'PADRE', 'ACUDIENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO'],
+    },
+    {
+      title: 'Perfil',
+      icon: <PersonIcon />,
+      path: '/perfil',
+      allowedRoles: ['ADMIN', 'DOCENTE', 'ESTUDIANTE', 'PADRE', 'ACUDIENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO'],
+    },
+    //{
+     // title: 'Configuración',
+     // icon: <SettingsIcon />,
+     // path: '/configuracion',
+      //allowedRoles: ['ADMIN', 'COORDINADOR', 'RECTOR'],
+    //},
+  ];
 
-  const handleToggleCursos = () => {
-    setOpenCursos(!openCursos);
-  };
+  // Filtrar menú por rol de usuario - usando useMemo para evitar recalcular en cada render
+  const userRole = user?.tipo || '';
+  const filteredMenu = useMemo(() => {
+    return menuItems.filter((item) => item.allowedRoles.includes(userRole));
+  }, [userRole]);
 
-  const handleToggleUsuarios = () => {
-    setOpenUsuarios(!openUsuarios);
-  };
-
-  // Función para determinar si un elemento está activo
-  const isActive = (path: string) => {
-    if (path === '/') {
-      return location.pathname === '/';
+  // Actualizamos el estado de expansión cuando cambia la ruta
+  useEffect(() => {
+    // Solo necesitamos ejecutar esto cuando cambia la ruta o el menú filtrado
+    const newOpenState: { [key: string]: boolean } = {...open};
+    let didChange = false;
+    
+    filteredMenu.forEach(item => {
+      if (item.children) {
+        const shouldBeOpen = item.children.some(child => 
+          location.pathname === child.path || location.pathname.startsWith(child.path)
+        );
+        
+        if (shouldBeOpen && !newOpenState[item.title]) {
+          newOpenState[item.title] = true;
+          didChange = true;
+        }
+      }
+    });
+    
+    // Solo actualizar el estado si hubo un cambio real
+    if (didChange) {
+      setOpen(newOpenState);
     }
-    return location.pathname.startsWith(path);
-  };
-
-  // Renderización condicional basada en el tipo de usuario
-  const isAdmin = user?.tipo === 'ADMIN';
-  const isDocente = user?.tipo === 'DOCENTE';
-  const isPadre = user?.tipo === 'PADRE';
-  const isEstudiante = user?.tipo === 'ESTUDIANTE';
-
-  // Mensajes no leídos (simulado)
-  const unreadMessages = 5;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname, filteredMenu]); // Eliminamos 'open' de las dependencias
 
   return (
-    <Box sx={{ overflowY: 'auto', height: '100%' }}>
-      <List component="nav" sx={{ px: 1 }}>
-        {/* Dashboard - para todos los usuarios */}
-        <ListItemButton
-          onClick={() => handleNavigate('/')}
-          selected={isActive('/')}
-          sx={{
-            borderRadius: 2,
-            mb: 0.5,
-            '&.Mui-selected': {
-              backgroundColor: 'rgba(93, 169, 233, 0.12)',
-              '&:hover': {
-                backgroundColor: 'rgba(93, 169, 233, 0.20)',
-              },
-              '& .MuiListItemIcon-root': {
-                color: 'primary.main',
-              },
-              '& .MuiListItemText-primary': {
-                color: 'primary.main',
-                fontWeight: 'bold',
-              },
-            },
-            '&:hover': {
-              backgroundColor: 'rgba(0, 0, 0, 0.04)',
-            },
-          }}
-        >
-          <ListItemIcon>
-            <DashboardIcon />
-          </ListItemIcon>
-          <ListItemText primary="Dashboard" />
-        </ListItemButton>
-
-        {/* Mensajes - para todos los usuarios */}
-        <ListItemButton
-          onClick={handleToggleMensajes}
-          selected={isActive('/mensajes')}
-          sx={{
-            borderRadius: 2,
-            mb: 0.5,
-            '&.Mui-selected': {
-              backgroundColor: 'rgba(93, 169, 233, 0.12)',
-              '&:hover': {
-                backgroundColor: 'rgba(93, 169, 233, 0.20)',
-              },
-              '& .MuiListItemIcon-root': {
-                color: 'primary.main',
-              },
-              '& .MuiListItemText-primary': {
-                color: 'primary.main',
-                fontWeight: 'bold',
-              },
-            },
-            '&:hover': {
-              backgroundColor: 'rgba(0, 0, 0, 0.04)',
-            },
-          }}
-        >
-          <ListItemIcon>
-            <Badge badgeContent={unreadMessages} color="error">
-              <MessageIcon />
-            </Badge>
-          </ListItemIcon>
-          <ListItemText primary="Mensajes" />
-          {openMensajes ? <ExpandLess /> : <ExpandMore />}
-        </ListItemButton>
-
-        <Collapse in={openMensajes} timeout="auto" unmountOnExit>
-          <List component="div" disablePadding>
-            <ListItemButton
-              onClick={() => handleNavigate('/mensajes/recibidos')}
-              selected={isActive('/mensajes/recibidos')}
-              sx={{
-                pl: 4,
-                borderRadius: 2,
-                mb: 0.5,
-                '&.Mui-selected': {
-                  backgroundColor: 'rgba(93, 169, 233, 0.08)',
-                  '&:hover': {
-                    backgroundColor: 'rgba(93, 169, 233, 0.16)',
-                  },
-                  '& .MuiListItemText-primary': {
-                    color: 'primary.main',
-                    fontWeight: 'bold',
-                  },
-                },
-              }}
-            >
-              <ListItemIcon>
-                <InboxIcon fontSize="small" />
-              </ListItemIcon>
-              <ListItemText 
-                primary={
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Typography variant="body2">Recibidos</Typography>
-                    <Badge badgeContent={unreadMessages} color="error" sx={{ ml: 1 }} />
-                  </Box>
-                } 
-              />
-            </ListItemButton>
-
-            <ListItemButton
-              onClick={() => handleNavigate('/mensajes/enviados')}
-              selected={isActive('/mensajes/enviados')}
-              sx={{
-                pl: 4,
-                borderRadius: 2,
-                mb: 0.5,
-                '&.Mui-selected': {
-                  backgroundColor: 'rgba(93, 169, 233, 0.08)',
-                  '&:hover': {
-                    backgroundColor: 'rgba(93, 169, 233, 0.16)',
-                  },
-                  '& .MuiListItemText-primary': {
-                    color: 'primary.main',
-                    fontWeight: 'bold',
-                  },
-                },
-              }}
-            >
-              <ListItemIcon>
-                <SendIcon fontSize="small" />
-              </ListItemIcon>
-              <ListItemText primary="Enviados" />
-            </ListItemButton>
-
-            <ListItemButton
-              onClick={() => handleNavigate('/mensajes/borradores')}
-              selected={isActive('/mensajes/borradores')}
-              sx={{
-                pl: 4,
-                borderRadius: 2,
-                mb: 0.5,
-                '&.Mui-selected': {
-                  backgroundColor: 'rgba(93, 169, 233, 0.08)',
-                  '&:hover': {
-                    backgroundColor: 'rgba(93, 169, 233, 0.16)',
-                  },
-                  '& .MuiListItemText-primary': {
-                    color: 'primary.main',
-                    fontWeight: 'bold',
-                  },
-                },
-              }}
-            >
-              <ListItemIcon>
-                <DraftsIcon fontSize="small" />
-              </ListItemIcon>
-              <ListItemText primary="Borradores" />
-            </ListItemButton>
-
-            <ListItemButton
-              onClick={() => handleNavigate('/mensajes/archivados')}
-              selected={isActive('/mensajes/archivados')}
-              sx={{
-                pl: 4,
-                borderRadius: 2,
-                mb: 0.5,
-                '&.Mui-selected': {
-                  backgroundColor: 'rgba(93, 169, 233, 0.08)',
-                  '&:hover': {
-                    backgroundColor: 'rgba(93, 169, 233, 0.16)',
-                  },
-                  '& .MuiListItemText-primary': {
-                    color: 'primary.main',
-                    fontWeight: 'bold',
-                  },
-                },
-              }}
-            >
-              <ListItemIcon>
-                <ArchiveIcon fontSize="small" />
-              </ListItemIcon>
-              <ListItemText primary="Archivados" />
-            </ListItemButton>
-          </List>
-        </Collapse>
-
-        {/* Calificaciones - Visible para todos los usuarios */}
-        <ListItemButton
-          onClick={handleToggleCalificaciones}
-          selected={isActive('/calificaciones')}
-          sx={{
-            borderRadius: 2,
-            mb: 0.5,
-            '&.Mui-selected': {
-              backgroundColor: 'rgba(93, 169, 233, 0.12)',
-              '&:hover': {
-                backgroundColor: 'rgba(93, 169, 233, 0.20)',
-              },
-              '& .MuiListItemIcon-root': {
-                color: 'primary.main',
-              },
-              '& .MuiListItemText-primary': {
-                color: 'primary.main',
-                fontWeight: 'bold',
-              },
-            },
-            '&:hover': {
-              backgroundColor: 'rgba(0, 0, 0, 0.04)',
-            },
-          }}
-        >
-          <ListItemIcon>
-            <GradingIcon />
-          </ListItemIcon>
-          <ListItemText primary="Calificaciones" />
-          {openCalificaciones ? <ExpandLess /> : <ExpandMore />}
-        </ListItemButton>
-
-        <Collapse in={openCalificaciones} timeout="auto" unmountOnExit>
-          <List component="div" disablePadding>
-            <ListItemButton
-              onClick={() => handleNavigate('/calificaciones/lista')}
-              selected={isActive('/calificaciones/lista')}
-              sx={{
-                pl: 4,
-                borderRadius: 2,
-                mb: 0.5,
-                '&.Mui-selected': {
-                  backgroundColor: 'rgba(93, 169, 233, 0.08)',
-                  '&:hover': {
-                    backgroundColor: 'rgba(93, 169, 233, 0.16)',
-                  },
-                  '& .MuiListItemText-primary': {
-                    color: 'primary.main',
-                    fontWeight: 'bold',
-                  },
-                },
-              }}
-            >
-              <ListItemText primary="Lista de Calificaciones" />
-            </ListItemButton>
-
-            <ListItemButton
-              onClick={() => handleNavigate('/calificaciones/boletin')}
-              selected={isActive('/calificaciones/boletin')}
-              sx={{
-                pl: 4,
-                borderRadius: 2,
-                mb: 0.5,
-                '&.Mui-selected': {
-                  backgroundColor: 'rgba(93, 169, 233, 0.08)',
-                  '&:hover': {
-                    backgroundColor: 'rgba(93, 169, 233, 0.16)',
-                  },
-                  '& .MuiListItemText-primary': {
-                    color: 'primary.main',
-                    fontWeight: 'bold',
-                  },
-                },
-              }}
-            >
-              <ListItemText primary="Boletín" />
-            </ListItemButton>
-
-            {(isAdmin || isDocente) && (
-              <ListItemButton
-                onClick={() => handleNavigate('/calificaciones/estadisticas')}
-                selected={isActive('/calificaciones/estadisticas')}
-                sx={{
-                  pl: 4,
-                  borderRadius: 2,
-                  mb: 0.5,
-                  '&.Mui-selected': {
-                    backgroundColor: 'rgba(93, 169, 233, 0.08)',
-                    '&:hover': {
-                      backgroundColor: 'rgba(93, 169, 233, 0.16)',
-                    },
-                    '& .MuiListItemText-primary': {
-                      color: 'primary.main',
-                      fontWeight: 'bold',
-                    },
-                  },
-                }}
-              >
-                <ListItemText primary="Estadísticas" />
-              </ListItemButton>
-            )}
-          </List>
-        </Collapse>
-
-        {/* Usuarios - Solo para administradores */}
-        {isAdmin && (
-          <>
-            <ListItemButton
-              onClick={handleToggleUsuarios}
-              selected={isActive('/usuarios')}
-              sx={{
-                borderRadius: 2,
-                mb: 0.5,
-                '&.Mui-selected': {
-                  backgroundColor: 'rgba(93, 169, 233, 0.12)',
-                  '&:hover': {
-                    backgroundColor: 'rgba(93, 169, 233, 0.20)',
-                  },
-                  '& .MuiListItemIcon-root': {
-                    color: 'primary.main',
-                  },
-                  '& .MuiListItemText-primary': {
-                    color: 'primary.main',
-                    fontWeight: 'bold',
-                  },
-                },
-                '&:hover': {
-                  backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                },
-              }}
-            >
-              <ListItemIcon>
-                <GroupIcon />
-              </ListItemIcon>
-              <ListItemText primary="Usuarios" />
-              {openUsuarios ? <ExpandLess /> : <ExpandMore />}
-            </ListItemButton>
-
-            <Collapse in={openUsuarios} timeout="auto" unmountOnExit>
-              <List component="div" disablePadding>
-                <ListItemButton
-                  onClick={() => handleNavigate('/usuarios')}
-                  selected={location.pathname === '/usuarios'}
-                  sx={{
-                    pl: 4,
-                    borderRadius: 2,
-                    mb: 0.5,
-                    '&.Mui-selected': {
-                      backgroundColor: 'rgba(93, 169, 233, 0.08)',
-                      '&:hover': {
-                        backgroundColor: 'rgba(93, 169, 233, 0.16)',
-                      },
-                      '& .MuiListItemText-primary': {
-                        color: 'primary.main',
-                        fontWeight: 'bold',
-                      },
-                    },
-                  }}
-                >
-                  <ListItemText primary="Lista de Usuarios" />
-                </ListItemButton>
-
-                <ListItemButton
-                  onClick={() => handleNavigate('/usuarios/nuevo')}
-                  selected={isActive('/usuarios/nuevo')}
-                  sx={{
-                    pl: 4,
-                    borderRadius: 2,
-                    mb: 0.5,
-                    '&.Mui-selected': {
-                      backgroundColor: 'rgba(93, 169, 233, 0.08)',
-                      '&:hover': {
-                        backgroundColor: 'rgba(93, 169, 233, 0.16)',
-                      },
-                      '& .MuiListItemText-primary': {
-                        color: 'primary.main',
-                        fontWeight: 'bold',
-                      },
-                    },
-                  }}
-                >
-                  <ListItemText primary="Nuevo Usuario" />
-                </ListItemButton>
-              </List>
-            </Collapse>
-          </>
-        )}
-
-        {/* Cursos - Para administradores y docentes */}
-        {(isAdmin || isDocente) && (
-          <>
-            <ListItemButton
-              onClick={handleToggleCursos}
-              selected={isActive('/cursos')}
-              sx={{
-                borderRadius: 2,
-                mb: 0.5,
-                '&.Mui-selected': {
-                  backgroundColor: 'rgba(93, 169, 233, 0.12)',
-                  '&:hover': {
-                    backgroundColor: 'rgba(93, 169, 233, 0.20)',
-                  },
-                  '& .MuiListItemIcon-root': {
-                    color: 'primary.main',
-                  },
-                  '& .MuiListItemText-primary': {
-                    color: 'primary.main',
-                    fontWeight: 'bold',
-                  },
-                },
-                '&:hover': {
-                  backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                },
-              }}
-            >
-              <ListItemIcon>
-                <SchoolIcon />
-              </ListItemIcon>
-              <ListItemText primary="Cursos" />
-              {openCursos ? <ExpandLess /> : <ExpandMore />}
-            </ListItemButton>
-
-            <Collapse in={openCursos} timeout="auto" unmountOnExit>
-              <List component="div" disablePadding>
-                <ListItemButton
-                  onClick={() => handleNavigate('/cursos')}
-                  selected={location.pathname === '/cursos'}
-                  sx={{
-                    pl: 4,
-                    borderRadius: 2,
-                    mb: 0.5,
-                    '&.Mui-selected': {
-                      backgroundColor: 'rgba(93, 169, 233, 0.08)',
-                      '&:hover': {
-                        backgroundColor: 'rgba(93, 169, 233, 0.16)',
-                      },
-                      '& .MuiListItemText-primary': {
-                        color: 'primary.main',
-                        fontWeight: 'bold',
-                      },
-                    },
-                  }}
-                >
-                  <ListItemText primary="Lista de Cursos" />
-                </ListItemButton>
-
-                {isAdmin && (
+    <Box sx={{ width: '100%', bgcolor: 'background.paper' }}>
+      <List component="nav" sx={{ p: 1 }}>
+        {filteredMenu.map((item) => {
+          const isActive = location.pathname === item.path || 
+                          (item.children && location.pathname.startsWith(item.path));
+          
+          if (item.children) {
+            return (
+              <React.Fragment key={item.title}>
+                <ListItem disablePadding>
                   <ListItemButton
-                    onClick={() => handleNavigate('/cursos/nuevo')}
-                    selected={isActive('/cursos/nuevo')}
+                    onClick={() => handleClick(item.path)}
                     sx={{
-                      pl: 4,
                       borderRadius: 2,
                       mb: 0.5,
-                      '&.Mui-selected': {
-                        backgroundColor: 'rgba(93, 169, 233, 0.08)',
-                        '&:hover': {
-                          backgroundColor: 'rgba(93, 169, 233, 0.16)',
-                        },
-                        '& .MuiListItemText-primary': {
-                          color: 'primary.main',
-                          fontWeight: 'bold',
-                        },
+                      bgcolor: isActive ? 'rgba(93, 169, 233, 0.1)' : 'transparent',
+                      '&:hover': {
+                        bgcolor: isActive ? 'rgba(93, 169, 233, 0.2)' : 'rgba(0, 0, 0, 0.04)',
                       },
                     }}
                   >
-                    <ListItemText primary="Nuevo Curso" />
+                    <ListItemIcon sx={{ color: isActive ? 'primary.main' : 'inherit' }}>
+                      {item.icon}
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={
+                        <Typography 
+                          variant="body1" 
+                          sx={{ 
+                            fontWeight: isActive ? 600 : 400, 
+                            color: isActive ? 'primary.main' : 'inherit' 
+                          }}
+                        >
+                          {item.title}
+                        </Typography>
+                      }
+                    />
+                    <IconButton
+                      size="small"
+                      onClick={(e) => handleToggle(item.title, e)}
+                      sx={{ ml: 1 }}
+                    >
+                      {open[item.title] ? <ExpandLess /> : <ExpandMore />}
+                    </IconButton>
                   </ListItemButton>
-                )}
-              </List>
-            </Collapse>
-          </>
-        )}
-
-        {/* Logros - Para administradores y docentes */}
-        {(isAdmin || isDocente) && (
-          <ListItemButton
-            onClick={() => handleNavigate('/logros')}
-            selected={isActive('/logros')}
-            sx={{
-              borderRadius: 2,
-              mb: 0.5,
-              '&.Mui-selected': {
-                backgroundColor: 'rgba(93, 169, 233, 0.12)',
-                '&:hover': {
-                  backgroundColor: 'rgba(93, 169, 233, 0.20)',
-                },
-                '& .MuiListItemIcon-root': {
-                  color: 'primary.main',
-                },
-                '& .MuiListItemText-primary': {
-                  color: 'primary.main',
-                  fontWeight: 'bold',
-                },
-              },
-              '&:hover': {
-                backgroundColor: 'rgba(0, 0, 0, 0.04)',
-              },
-            }}
-          >
-            <ListItemIcon>
-              <StarIcon />
-            </ListItemIcon>
-            <ListItemText primary="Logros Académicos" />
-          </ListItemButton>
-        )}
-
-        {/* Perfil - Para todos los usuarios */}
-        <ListItemButton
-          onClick={() => handleNavigate('/perfil')}
-          selected={isActive('/perfil')}
-          sx={{
-            borderRadius: 2,
-            mb: 0.5,
-            '&.Mui-selected': {
-              backgroundColor: 'rgba(93, 169, 233, 0.12)',
-              '&:hover': {
-                backgroundColor: 'rgba(93, 169, 233, 0.20)',
-              },
-              '& .MuiListItemIcon-root': {
-                color: 'primary.main',
-              },
-              '& .MuiListItemText-primary': {
-                color: 'primary.main',
-                fontWeight: 'bold',
-              },
-            },
-            '&:hover': {
-              backgroundColor: 'rgba(0, 0, 0, 0.04)',
-            },
-          }}
-        >
-          <ListItemIcon>
-            <PersonIcon />
-          </ListItemIcon>
-          <ListItemText primary="Mi Perfil" />
-        </ListItemButton>
-
-        {/* Configuración - Solo para administradores */}
-        {isAdmin && (
-          <ListItemButton
-            onClick={() => handleNavigate('/configuracion')}
-            selected={isActive('/configuracion')}
-            sx={{
-              borderRadius: 2,
-              mb: 0.5,
-              '&.Mui-selected': {
-                backgroundColor: 'rgba(93, 169, 233, 0.12)',
-                '&:hover': {
-                  backgroundColor: 'rgba(93, 169, 233, 0.20)',
-                },
-                '& .MuiListItemIcon-root': {
-                  color: 'primary.main',
-                },
-                '& .MuiListItemText-primary': {
-                  color: 'primary.main',
-                  fontWeight: 'bold',
-                },
-              },
-              '&:hover': {
-                backgroundColor: 'rgba(0, 0, 0, 0.04)',
-              },
-            }}
-          >
-            <ListItemIcon>
-              <SettingsIcon />
-            </ListItemIcon>
-            <ListItemText primary="Configuración" />
-          </ListItemButton>
-        )}
+                </ListItem>
+                <Collapse in={open[item.title]} timeout="auto" unmountOnExit>
+                  <List component="div" disablePadding>
+                    {item.children
+                      .filter(child => child.allowedRoles.includes(userRole))
+                      .map((child) => {
+                        const isChildActive = location.pathname === child.path ||
+                                            location.pathname.startsWith(child.path);
+                        return (
+                          <ListItem key={child.title} disablePadding>
+                            <ListItemButton
+                              onClick={() => handleClick(child.path)}
+                              sx={{
+                                pl: 4,
+                                borderRadius: 2,
+                                mb: 0.5,
+                                bgcolor: isChildActive ? 'rgba(93, 169, 233, 0.1)' : 'transparent',
+                                '&:hover': {
+                                  bgcolor: isChildActive ? 'rgba(93, 169, 233, 0.2)' : 'rgba(0, 0, 0, 0.04)',
+                                },
+                              }}
+                            >
+                              <ListItemIcon sx={{ color: isChildActive ? 'primary.main' : 'inherit' }}>
+                                {child.icon}
+                              </ListItemIcon>
+                              <ListItemText 
+                                primary={
+                                  <Typography 
+                                    variant="body1" 
+                                    sx={{ 
+                                      fontWeight: isChildActive ? 600 : 400, 
+                                      color: isChildActive ? 'primary.main' : 'inherit' 
+                                    }}
+                                  >
+                                    {child.title}
+                                  </Typography>
+                                }
+                              />
+                            </ListItemButton>
+                          </ListItem>
+                        );
+                      })}
+                  </List>
+                </Collapse>
+              </React.Fragment>
+            );
+          }
+          
+          return (
+            <ListItem key={item.title} disablePadding>
+              <ListItemButton
+                onClick={() => handleClick(item.path)}
+                sx={{
+                  borderRadius: 2,
+                  mb: 0.5,
+                  bgcolor: isActive ? 'rgba(93, 169, 233, 0.1)' : 'transparent',
+                  '&:hover': {
+                    bgcolor: isActive ? 'rgba(93, 169, 233, 0.2)' : 'rgba(0, 0, 0, 0.04)',
+                  },
+                }}
+              >
+                <ListItemIcon sx={{ color: isActive ? 'primary.main' : 'inherit' }}>
+                  {item.icon}
+                </ListItemIcon>
+                <ListItemText 
+                  primary={
+                    <Typography 
+                      variant="body1" 
+                      sx={{ 
+                        fontWeight: isActive ? 600 : 400, 
+                        color: isActive ? 'primary.main' : 'inherit' 
+                      }}
+                    >
+                      {item.title}
+                    </Typography>
+                  }
+                />
+              </ListItemButton>
+            </ListItem>
+          );
+        })}
       </List>
-
-      {/* Información de la versión */}
-      <Box sx={{ mt: 'auto', p: 2, textAlign: 'center' }}>
-        <Divider sx={{ mb: 2 }} />
-        <Typography variant="caption" color="text.secondary">
-          EducaNexo360 v1.0.0
+      <Divider />
+      <Box sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Typography variant="caption" color="text.secondary" align="center">
+          EducaNexo360 © {new Date().getFullYear()}
         </Typography>
       </Box>
     </Box>

@@ -1,89 +1,132 @@
 // src/services/usuarioService.ts
 import axiosInstance from '../api/axiosConfig';
+import API_ROUTES from '../constants/apiRoutes';
 
-// Interfaces para el tipo de usuario
-export interface Usuario {
+export interface IUsuario {
   _id: string;
+  email: string;
   nombre: string;
   apellidos: string;
-  email: string;
   tipo: string;
+  escuelaId: string;
   estado: string;
-  escuelaId: string | { _id: string; nombre: string };
-  createdAt?: string;
-  updatedAt?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
-export interface UsuarioInput {
-  nombre: string;
-  apellidos: string;
-  email: string;
-  password?: string;
-  tipo: string;
-  estado: string;
-  escuelaId: string;
+// Tipo para respuestas de la API
+interface ApiResponse<T> {
+  success: boolean;
+  data: T;
+  message?: string;
 }
 
 class UsuarioService {
   /**
-   * Obtiene la lista de usuarios con paginación y filtros
+   * Obtiene una lista de usuarios con filtros opcionales
+   * @param params Parámetros para filtrar usuarios
+   * @returns Lista de usuarios
    */
-  async obtenerUsuarios(params = {}) {
-    const response = await axiosInstance.get('/usuarios', { params });
-    return response.data;
+  async obtenerUsuarios(params?: {
+    tipo?: string;
+    escuelaId?: string;
+    estado?: string;
+  }): Promise<IUsuario[]> {
+    try {
+      const response = await axiosInstance.get(API_ROUTES.USUARIOS.BASE, { params });
+      return response.data.data;
+    } catch (error) {
+      console.error('Error al obtener usuarios:', error);
+      throw error;
+    }
   }
 
   /**
-   * Obtiene la información de un usuario por su ID
+   * Obtiene un usuario específico por su ID
+   * @param id ID del usuario
+   * @returns Respuesta con los detalles del usuario
    */
-  async obtenerUsuario(id: string) {
-    const response = await axiosInstance.get(`/usuarios/${id}`);
-    return response.data;
+  async obtenerUsuario(id: string): Promise<ApiResponse<IUsuario>> {
+    try {
+      const response = await axiosInstance.get(`${API_ROUTES.USUARIOS.BASE}/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error al obtener usuario:', error);
+      throw error;
+    }
   }
 
   /**
-   * Crea un nuevo usuario
+   * Busca usuarios por un término
+   * @param query Término de búsqueda
+   * @returns Lista de usuarios que coinciden con la búsqueda
    */
-  async crearUsuario(usuario: UsuarioInput) {
-    const response = await axiosInstance.post('/auth/register', usuario);
-    return response.data;
+  async buscarUsuarios(query: string): Promise<IUsuario[]> {
+    try {
+      const response = await axiosInstance.get(`${API_ROUTES.USUARIOS.BUSCAR}`, {
+        params: { q: query }
+      });
+      return response.data.data;
+    } catch (error) {
+      console.error('Error al buscar usuarios:', error);
+      throw error;
+    }
   }
 
   /**
-   * Actualiza la información de un usuario
+   * Actualiza los datos de un usuario
+   * @param id ID del usuario
+   * @param data Datos a actualizar
+   * @returns Usuario actualizado
    */
-  async actualizarUsuario(id: string, usuario: Partial<UsuarioInput>) {
-    const response = await axiosInstance.put(`/usuarios/${id}`, usuario);
-    return response.data;
-  }
-
-  /**
-   * Elimina (desactiva) un usuario
-   */
-  async eliminarUsuario(id: string) {
-    const response = await axiosInstance.delete(`/usuarios/${id}`);
-    return response.data;
+  async actualizarUsuario(id: string, data: {
+    nombre?: string;
+    apellidos?: string;
+    email?: string;
+    tipo?: string;
+  }): Promise<IUsuario> {
+    try {
+      const response = await axiosInstance.put(`${API_ROUTES.USUARIOS.BASE}/${id}`, data);
+      return response.data.data;
+    } catch (error) {
+      console.error('Error al actualizar usuario:', error);
+      throw error;
+    }
   }
 
   /**
    * Cambia la contraseña de un usuario
+   * @param id ID del usuario
+   * @param passwordActual Contraseña actual
+   * @param nuevaPassword Nueva contraseña
+   * @returns Mensaje de confirmación
    */
-  async cambiarPassword(id: string, passwordActual: string, nuevaPassword: string) {
-    const response = await axiosInstance.post(`/usuarios/${id}/cambiar-password`, {
-      passwordActual,
-      nuevaPassword,
-    });
-    return response.data;
+  async cambiarPassword(id: string, data: {
+    passwordActual: string;
+    nuevaPassword: string;
+  }): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await axiosInstance.post(API_ROUTES.USUARIOS.CAMBIAR_PASSWORD(id), data);
+      return response.data;
+    } catch (error) {
+      console.error('Error al cambiar la contraseña:', error);
+      throw error;
+    }
   }
 
   /**
-   * Buscar usuarios
+   * Elimina un usuario (desactivación)
+   * @param id ID del usuario
+   * @returns Mensaje de confirmación
    */
-  async buscarUsuarios(query: string) {
-    const response = await axiosInstance.get('/usuarios/buscar', {
-      params: { q: query },
-    });
-    return response.data;
+  async eliminarUsuario(id: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await axiosInstance.delete(`${API_ROUTES.USUARIOS.BASE}/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error al eliminar usuario:', error);
+      throw error;
+    }
   }
 }
 

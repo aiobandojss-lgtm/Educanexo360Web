@@ -46,6 +46,7 @@ import {
   AssignmentInd,
   Add,
   Remove,
+  Schedule,
 } from '@mui/icons-material';
 import cursoService, { Curso, EstudianteCurso, AsignaturaCurso } from '../../services/cursoService';
 import { useSelector } from 'react-redux';
@@ -237,6 +238,17 @@ const DetalleCurso = () => {
     return `${nombre.charAt(0)}${apellidos.charAt(0)}`.toUpperCase();
   };
 
+  // Obtener texto descriptivo para la jornada
+  const getJornadaText = (jornada?: string) => {
+    switch (jornada) {
+      case 'MATUTINA': return 'Matutina (Mañana)';
+      case 'VESPERTINA': return 'Vespertina (Tarde)';
+      case 'NOCTURNA': return 'Nocturna (Noche)';
+      case 'COMPLETA': return 'Completa (Todo el día)';
+      default: return 'No asignada';
+    }
+  };
+
   if (loading && !curso) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
@@ -419,7 +431,19 @@ const DetalleCurso = () => {
                   <School color="primary" sx={{ mr: 2 }} />
                   <ListItemText
                     primary="Grado - Grupo"
-                    secondary={`${curso.grado}° - ${curso.grupo}`}
+                    secondary={curso.grado && curso.grupo ? `${curso.grado}° - ${curso.grupo}` : 'No asignado'}
+                    primaryTypographyProps={{ variant: 'caption', color: 'text.secondary' }}
+                    secondaryTypographyProps={{ variant: 'body1', fontWeight: 500 }}
+                  />
+                </ListItem>
+                <Divider component="li" />
+                
+                {/* Nuevo item para mostrar la jornada */}
+                <ListItem>
+                  <Schedule color="primary" sx={{ mr: 2 }} />
+                  <ListItemText
+                    primary="Jornada"
+                    secondary={getJornadaText(curso.jornada)}
                     primaryTypographyProps={{ variant: 'caption', color: 'text.secondary' }}
                     secondaryTypographyProps={{ variant: 'body1', fontWeight: 500 }}
                   />
@@ -432,7 +456,9 @@ const DetalleCurso = () => {
                     primary="Director de grupo"
                     secondary={
                       typeof curso.director_grupo === 'object' && curso.director_grupo !== null
-                        ? `${curso.director_grupo.nombre} ${curso.director_grupo.apellidos}`
+                        ? (curso.director_grupo.nombre && curso.director_grupo.apellidos
+                            ? `${curso.director_grupo.nombre} ${curso.director_grupo.apellidos}`
+                            : 'Docente asignado')
                         : 'No asignado'
                     }
                     primaryTypographyProps={{ variant: 'caption', color: 'text.secondary' }}
@@ -645,10 +671,12 @@ const DetalleCurso = () => {
                             <TableCell>{asignatura.codigo}</TableCell>
                             <TableCell>{asignatura.creditos}</TableCell>
                             <TableCell>
-                              {asignatura.docente
-                                ? `${asignatura.docente.nombre} ${asignatura.docente.apellidos}`
-                                : 'No asignado'}
-                            </TableCell>
+                                {asignatura.docente ? (
+                                  typeof asignatura.docente === 'object' ? 
+                                    `${asignatura.docente.nombre || ''} ${asignatura.docente.apellidos || ''}` : 
+                                    String(asignatura.docente)
+                                ) : 'No asignado'}
+                              </TableCell>
                             <TableCell align="center">
                               <IconButton
                                 edge="end"

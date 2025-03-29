@@ -1,493 +1,377 @@
 // src/components/layout/MainLayout.tsx
-import React, { useState, useEffect } from 'react';
-import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Outlet, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import {
   Box,
-  CssBaseline,
   Drawer,
   AppBar,
   Toolbar,
   Typography,
-  Divider,
   IconButton,
   Avatar,
   Menu,
   MenuItem,
   ListItemIcon,
-  Badge,
   useMediaQuery,
   useTheme,
-  Breadcrumbs,
-  Link,
-  Alert,
-  Snackbar,
+  Divider,
+  Badge,
+  Container,
+  Paper,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
-  ChevronLeft as ChevronLeftIcon,
+  Person as PersonIcon,
+  Logout as LogoutIcon,
+  Settings as SettingsIcon,
   Notifications as NotificationsIcon,
-  AccountCircle,
-  Logout,
-  Settings,
-  Person,
+  ArrowBack as ArrowBackIcon,
 } from '@mui/icons-material';
-import { RootState } from '../../redux/store';
 import NavigationMenu from './NavigationMenu';
-import { logout } from '../../services/authService';
-// Este import no se incluía en los archivos proporcionados, se deberá crear
-// o ajustar según la implementación específica de manejo de notificaciones
-import { fetchNotificaciones, markNotificacionAsRead } from '../../redux/slices/notificacionesSlice';
+import { logout } from '../../redux/slices/authSlice';
+import { RootState } from '../../redux/store';
 
-// Ancho del drawer cuando está abierto
-const drawerWidth = 260;
-
-// Mapeo de rutas a breadcrumbs más amigables
-const routeNameMap: Record<string, string> = {
-  '': 'Dashboard',
-  'mensajes': 'Mensajes',
-  'calificaciones': 'Calificaciones',
-  'usuarios': 'Usuarios',
-  'cursos': 'Cursos',
-  'perfil': 'Mi Perfil',
-  'logros': 'Logros Académicos',
-  'boletin': 'Boletín',
-  'estadisticas': 'Estadísticas',
-  'lista': 'Lista',
-  'nuevo': 'Nuevo',
-  'editar': 'Editar',
-  'recibidos': 'Recibidos',
-  'enviados': 'Enviados',
-  'borradores': 'Borradores',
-  'archivados': 'Archivados',
+// Función para obtener la etiqueta correcta del rol de usuario
+const getRoleLabel = (role?: string): string => {
+  if (!role) return 'Usuario';
+  
+  switch (role) {
+    case 'ADMIN':
+      return 'Administrador';
+    case 'COORDINADOR':
+      return 'Coordinador';
+    case 'RECTOR':
+      return 'Rector';
+    case 'ASISTENTE':
+      return 'Asistente';
+    case 'ESTUDIANTE':
+      return 'Estudiante';
+    case 'ACUDIENTE':
+      return 'Acudiente';
+    case 'PADRE':
+      return 'Padre';
+    case 'DOCENTE':
+      return 'Docente';
+    case 'ADMINISTRATIVO':
+      return 'Administrativo';
+    default:
+      return role;
+  }
 };
+
+const drawerWidth = 260;
 
 const MainLayout: React.FC = () => {
   const theme = useTheme();
   const isSmallScreen = useMediaQuery(theme.breakpoints.down('md'));
-  const { user } = useSelector((state: RootState) => state.auth);
-  const dispatch = useDispatch();
   const navigate = useNavigate();
-  const location = useLocation();
+  const dispatch = useDispatch();
+  const { user } = useSelector((state: RootState) => state.auth);
   
-  // Estado para el drawer
-  const [open, setOpen] = useState(!isSmallScreen);
-  
-  // Estado para el menú de usuario
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const userMenuOpen = Boolean(anchorEl);
+  const [notificationsAnchorEl, setNotificationsAnchorEl] = useState<null | HTMLElement>(null);
   
-  // Estado para el menú de notificaciones
-  const [notificationAnchorEl, setNotificationAnchorEl] = useState<null | HTMLElement>(null);
-  const notificationMenuOpen = Boolean(notificationAnchorEl);
-  
-  // Estado para alertas/notificaciones
-  const [snackbar, setSnackbar] = useState<{
-    open: boolean;
-    message: string;
-    severity: 'success' | 'info' | 'warning' | 'error';
-  }>({
-    open: false,
-    message: '',
-    severity: 'info',
-  });
-  
-  // Ejemplo de notificaciones (en una implementación real se obtendrían de Redux)
-  const [notificaciones, setNotificaciones] = useState<Array<{id: string; mensaje: string; leido: boolean}>>([
-    { id: '1', mensaje: 'Nuevo mensaje de coordinación', leido: false },
-    { id: '2', mensaje: 'Calificación actualizada en Matemáticas', leido: false },
-    { id: '3', mensaje: 'Recordatorio: Entrega de trabajos', leido: true },
-  ]);
-  
-  // Efecto para ajustar el drawer en pantallas pequeñas
-  useEffect(() => {
-    setOpen(!isSmallScreen);
-  }, [isSmallScreen]);
-  
-  // Efecto para cargar notificaciones (simulado)
-  useEffect(() => {
-    // Aquí se podría dispatch para cargar notificaciones reales
-    // dispatch(fetchNotificaciones());
-  }, []);
-  
-  // Generar breadcrumbs basados en la ruta actual
-  const generateBreadcrumbs = () => {
-    const pathSegments = location.pathname.split('/').filter(Boolean);
-    
-    // Si no hay segmentos, estamos en la raíz (Dashboard)
-    if (pathSegments.length === 0) {
-      return (
-        <Breadcrumbs aria-label="breadcrumb">
-          <Typography color="text.primary">Dashboard</Typography>
-        </Breadcrumbs>
-      );
-    }
-    
-    return (
-      <Breadcrumbs aria-label="breadcrumb">
-        <Link 
-          color="inherit" 
-          href="#" 
-          onClick={(e) => {
-            e.preventDefault();
-            navigate('/');
-          }}
-          sx={{ textDecoration: 'none' }}
-        >
-          Dashboard
-        </Link>
-        
-        {pathSegments.map((segment, index) => {
-          // Ignorar IDs en la ruta para los breadcrumbs
-          if (segment.match(/^[0-9a-fA-F]{24}$/)) {
-            return null;
-          }
-          
-          const displayName = routeNameMap[segment] || segment;
-          const to = '/' + pathSegments.slice(0, index + 1).join('/');
-          
-          const isLast = index === pathSegments.length - 1 || 
-                        (index === pathSegments.length - 2 && 
-                        pathSegments[pathSegments.length - 1].match(/^[0-9a-fA-F]{24}$/));
-          
-          return isLast ? (
-            <Typography color="text.primary" key={to}>
-              {displayName}
-            </Typography>
-          ) : (
-            <Link
-              key={to}
-              color="inherit"
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                navigate(to);
-              }}
-              sx={{ textDecoration: 'none' }}
-            >
-              {displayName}
-            </Link>
-          );
-        })}
-      </Breadcrumbs>
-    );
-  };
-  
-  // Handlers
+  const openUserMenu = Boolean(anchorEl);
+  const openNotificationsMenu = Boolean(notificationsAnchorEl);
+
   const handleDrawerToggle = () => {
-    setOpen(!open);
+    setMobileOpen(!mobileOpen);
   };
-  
-  const handleUserMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+
+  const handleCloseDrawer = () => {
+    if (isSmallScreen) {
+      setMobileOpen(false);
+    }
+  };
+
+  const handleUserMenuClick = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
   };
-  
+
   const handleUserMenuClose = () => {
     setAnchorEl(null);
   };
-  
-  const handleNotificationMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
-    setNotificationAnchorEl(event.currentTarget);
+
+  const handleNotificationsClick = (event: React.MouseEvent<HTMLElement>) => {
+    setNotificationsAnchorEl(event.currentTarget);
   };
-  
-  const handleNotificationMenuClose = () => {
-    setNotificationAnchorEl(null);
+
+  const handleNotificationsClose = () => {
+    setNotificationsAnchorEl(null);
   };
-  
+
   const handleLogout = () => {
-    logout();
+    handleUserMenuClose();
+    dispatch(logout());
     navigate('/login');
   };
-  
-  const handleProfileClick = () => {
+
+  const handleViewProfile = () => {
     handleUserMenuClose();
     navigate('/perfil');
   };
-  
-  const handleSettingsClick = () => {
+
+  const handleViewSettings = () => {
     handleUserMenuClose();
-    navigate('/perfil/editar');
+    if (user?.tipo === 'ADMIN') {
+      navigate('/configuracion');
+    } else {
+      navigate('/perfil');
+    }
   };
-  
-  const handleNotificationClick = (id: string) => {
-    // En una implementación real, se marcaría como leída y navegaría a la ubicación correspondiente
-    setNotificaciones(prev => 
-      prev.map(n => n.id === id ? {...n, leido: true} : n)
-    );
-    // dispatch(markNotificacionAsRead(id));
-    handleNotificationMenuClose();
-    // Aquí se podría navegar a la ruta específica según el tipo de notificación
-  };
-  
-  const handleCloseSnackbar = () => {
-    setSnackbar({ ...snackbar, open: false });
-  };
-  
-  const unreadNotificationsCount = notificaciones.filter(n => !n.leido).length;
-  
+
+  const drawer = (
+    <Box>
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          py: 3,
+          bgcolor: 'primary.main',
+          color: 'white',
+        }}
+      >
+        <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 'bold' }}>
+          EducaNexo360
+        </Typography>
+        <Typography variant="subtitle2" sx={{ mt: 1 }}>
+          {getRoleLabel(user?.tipo)}
+        </Typography>
+      </Box>
+      <Box sx={{ mt: 1 }} onClick={handleCloseDrawer}>
+        <NavigationMenu />
+      </Box>
+    </Box>
+  );
+
   return (
-    <Box sx={{ display: 'flex', height: '100vh' }}>
-      <CssBaseline />
-      
-      {/* App Bar */}
-      <AppBar 
-        position="fixed" 
-        sx={{ 
-          zIndex: theme => theme.zIndex.drawer + 1,
-          transition: theme => theme.transitions.create(['width', 'margin'], {
-            easing: theme.transitions.easing.sharp,
-            duration: theme.transitions.duration.leavingScreen,
-          }),
-          ...(open && {
-            marginLeft: drawerWidth,
-            width: `calc(100% - ${drawerWidth}px)`,
-            transition: theme => theme.transitions.create(['width', 'margin'], {
-              easing: theme.transitions.easing.sharp,
-              duration: theme.transitions.duration.enteringScreen,
-            }),
-          }),
-          boxShadow: '0px 4px 4px rgba(0, 0, 0, 0.05)',
+    <Box sx={{ display: 'flex' }}>
+      <AppBar
+        position="fixed"
+        sx={{
+          width: { md: `calc(100% - ${drawerWidth}px)` },
+          ml: { md: `${drawerWidth}px` },
+          boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
+          bgcolor: 'white',
+          color: 'text.primary',
         }}
       >
         <Toolbar>
           <IconButton
             color="inherit"
-            aria-label="toggle drawer"
-            onClick={handleDrawerToggle}
+            aria-label="open drawer"
             edge="start"
-            sx={{
-              marginRight: 2,
-            }}
+            onClick={handleDrawerToggle}
+            sx={{ mr: 2, display: { md: 'none' } }}
           >
-            {open ? <ChevronLeftIcon /> : <MenuIcon />}
+            <MenuIcon />
           </IconButton>
           
-          <Typography
-            variant="h6"
-            component="div"
-            sx={{ flexGrow: 1, fontWeight: 'bold' }}
-          >
-            EducaNexo360
-          </Typography>
-          
-          {/* Notificaciones */}
-          <IconButton 
-            color="inherit" 
-            onClick={handleNotificationMenuOpen}
-            sx={{ mr: 2 }}
-          >
-            <Badge badgeContent={unreadNotificationsCount} color="error">
-              <NotificationsIcon />
-            </Badge>
-          </IconButton>
-          
-          {/* Menú de notificaciones */}
-          <Menu
-            anchorEl={notificationAnchorEl}
-            open={notificationMenuOpen}
-            onClose={handleNotificationMenuClose}
-            PaperProps={{
-              sx: {
-                width: 320,
-                maxHeight: 400,
-                mt: 1.5,
-                boxShadow: '0px 4px 10px rgba(0, 0, 0, 0.1)',
-                borderRadius: 2,
-              }
-            }}
-            transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-            anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
-          >
-            <Typography variant="subtitle1" sx={{ p: 2, fontWeight: 'bold', borderBottom: '1px solid rgba(0, 0, 0, 0.1)' }}>
-              Notificaciones
-            </Typography>
-            
-            {notificaciones.length === 0 ? (
-              <MenuItem>
-                <Typography variant="body2">No tienes notificaciones</Typography>
-              </MenuItem>
-            ) : (
-              notificaciones.map((notif) => (
-                <MenuItem 
-                  key={notif.id} 
-                  onClick={() => handleNotificationClick(notif.id)}
-                  sx={{ 
-                    py: 1.5,
-                    borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
-                    bgcolor: notif.leido ? 'transparent' : 'rgba(93, 169, 233, 0.08)',
-                  }}
-                >
-                  <Badge 
-                    variant="dot" 
-                    color="primary" 
-                    invisible={notif.leido}
-                    sx={{ '& .MuiBadge-dot': { top: 8, right: 8 } }}
-                  >
-                    <Typography variant="body2" sx={{ fontWeight: notif.leido ? 'normal' : 'bold' }}>
-                      {notif.mensaje}
-                    </Typography>
-                  </Badge>
-                </MenuItem>
-              ))
-            )}
-          </Menu>
-          
-          {/* Perfil de usuario */}
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <IconButton
-              onClick={handleUserMenuOpen}
-              sx={{ p: 0 }}
-              aria-controls={userMenuOpen ? 'user-menu' : undefined}
-              aria-haspopup="true"
-              aria-expanded={userMenuOpen ? 'true' : undefined}
-            >
-              <Avatar sx={{ bgcolor: 'secondary.main' }}>
-                {user?.nombre?.charAt(0) || 'U'}
-              </Avatar>
-            </IconButton>
-            
-            {!isSmallScreen && (
-              <Typography variant="subtitle2" sx={{ ml: 1 }}>
-                {user?.nombre} {user?.apellidos}
-              </Typography>
-            )}
+          <Box sx={{ display: { xs: 'none', sm: 'flex' }, alignItems: 'center' }}>
+            <ArrowBackIcon 
+              sx={{ cursor: 'pointer', mr: 1 }} 
+              onClick={() => navigate(-1)}
+            />
           </Box>
           
-          {/* Menú de perfil */}
-          <Menu
-            id="user-menu"
-            anchorEl={anchorEl}
-            open={userMenuOpen}
-            onClose={handleUserMenuClose}
-            MenuListProps={{
-              'aria-labelledby': 'user-button',
-            }}
-            PaperProps={{
-              sx: {
-                width: 200,
-                mt: 1.5,
-                boxShadow: '0px 4px 10px rgba(0, 0, 0, 0.1)',
-                borderRadius: 2,
-              }
-            }}
-            transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-            anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
-          >
-            <MenuItem onClick={handleProfileClick}>
-              <ListItemIcon>
-                <Person fontSize="small" />
-              </ListItemIcon>
-              Mi Perfil
-            </MenuItem>
-            <MenuItem onClick={handleSettingsClick}>
-              <ListItemIcon>
-                <Settings fontSize="small" />
-              </ListItemIcon>
-              Configuración
-            </MenuItem>
-            <Divider />
-            <MenuItem onClick={handleLogout}>
-              <ListItemIcon>
-                <Logout fontSize="small" />
-              </ListItemIcon>
-              Cerrar Sesión
-            </MenuItem>
-          </Menu>
+          <Box sx={{ flexGrow: 1 }} />
+          
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <IconButton
+              color="inherit"
+              onClick={handleNotificationsClick}
+              sx={{ mr: 2 }}
+            >
+              <Badge badgeContent={2} color="primary">
+                <NotificationsIcon />
+              </Badge>
+            </IconButton>
+            
+            <IconButton
+              onClick={handleUserMenuClick}
+              sx={{
+                padding: 0.5,
+                border: '2px solid',
+                borderColor: 'primary.main',
+              }}
+            >
+              <Avatar
+                sx={{ bgcolor: 'primary.main', width: 32, height: 32 }}
+                alt={`${user?.nombre} ${user?.apellidos}`}
+              >
+                {user?.nombre?.[0] || 'U'}
+              </Avatar>
+            </IconButton>
+          </Box>
         </Toolbar>
       </AppBar>
       
-      {/* Drawer de navegación */}
-      <Drawer
-        variant={isSmallScreen ? "temporary" : "permanent"}
-        open={open}
-        onClose={isSmallScreen ? handleDrawerToggle : undefined}
-        sx={{
-          width: drawerWidth,
-          flexShrink: 0,
-          [`& .MuiDrawer-paper`]: {
-            width: drawerWidth,
-            boxSizing: 'border-box',
-            boxShadow: '0px 4px 10px rgba(0, 0, 0, 0.05)',
-            border: 'none',
-          },
-        }}
+      <Box
+        component="nav"
+        sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}
       >
-        <Toolbar
+        <Drawer
+          variant="temporary"
+          open={mobileOpen}
+          onClose={handleDrawerToggle}
+          ModalProps={{
+            keepMounted: true, // Better open performance on mobile.
+          }}
           sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            px: [1],
-            height: 64,
-            bgcolor: 'primary.main',
-            color: 'white',
+            display: { xs: 'block', md: 'none' },
+            '& .MuiDrawer-paper': { 
+              boxSizing: 'border-box', 
+              width: drawerWidth,
+              boxShadow: '0px 4px 10px rgba(0, 0, 0, 0.1)',
+            },
           }}
         >
-          <Typography variant="h6" fontWeight="bold">
-            EducaNexo360
-          </Typography>
-        </Toolbar>
-        <Divider />
-        
-        {/* Componente de navegación */}
-        <NavigationMenu />
-      </Drawer>
+          {drawer}
+        </Drawer>
+        <Drawer
+          variant="permanent"
+          sx={{
+            display: { xs: 'none', md: 'block' },
+            '& .MuiDrawer-paper': { 
+              boxSizing: 'border-box', 
+              width: drawerWidth,
+              boxShadow: '2px 0px 10px rgba(0, 0, 0, 0.05)',
+              border: 'none',
+            },
+          }}
+          open
+        >
+          {drawer}
+        </Drawer>
+      </Box>
       
-      {/* Contenido principal */}
       <Box
         component="main"
         sx={{
           flexGrow: 1,
           p: 3,
-          width: { sm: `calc(100% - ${open ? drawerWidth : 0}px)` },
-          transition: theme => theme.transitions.create('margin', {
-            easing: theme.transitions.easing.sharp,
-            duration: theme.transitions.duration.leavingScreen,
-          }),
-          marginLeft: 0,
-          ...(open && {
-            transition: theme => theme.transitions.create('margin', {
-              easing: theme.transitions.easing.easeOut,
-              duration: theme.transitions.duration.enteringScreen,
-            }),
-            marginLeft: 0,
-          }),
-          backgroundColor: '#f8f9fa',
+          width: { md: `calc(100% - ${drawerWidth}px)` },
           minHeight: '100vh',
-          maxHeight: '100vh',
-          overflow: 'auto',
+          bgcolor: 'background.default',
         }}
       >
-        <Toolbar /> {/* Espaciador para evitar que el contenido se oculte bajo la AppBar */}
-        
-        {/* Breadcrumbs */}
-        <Box sx={{ mb: 3, mt: 1 }}>
-          {generateBreadcrumbs()}
-        </Box>
-        
-        {/* Contenido de la ruta actual */}
-        <Outlet />
+        <Toolbar />
+        <Container maxWidth="xl" sx={{ pb: 4 }}>
+          <Outlet />
+        </Container>
       </Box>
       
-      {/* Snackbar para alertas y notificaciones */}
-      <Snackbar 
-        open={snackbar.open} 
-        autoHideDuration={6000} 
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert 
-          onClose={handleCloseSnackbar} 
-          severity={snackbar.severity} 
-          sx={{ 
-            width: '100%',
-            boxShadow: '0px 4px 10px rgba(0, 0, 0, 0.1)',
+      {/* Menú de Usuario */}
+      <Menu
+        anchorEl={anchorEl}
+        open={openUserMenu}
+        onClose={handleUserMenuClose}
+        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+        PaperProps={{
+          elevation: 2,
+          sx: {
+            mt: 1.5,
             borderRadius: 2,
-          }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
+            minWidth: 180,
+          },
+        }}
+      >
+        <Box sx={{ px: 2, py: 1 }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+            {user?.nombre} {user?.apellidos}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {user?.email}
+          </Typography>
+        </Box>
+        
+        <Divider />
+        
+        <MenuItem onClick={handleViewProfile}>
+          <ListItemIcon>
+            <PersonIcon fontSize="small" />
+          </ListItemIcon>
+          Perfil
+        </MenuItem>
+        
+        <MenuItem onClick={handleViewSettings}>
+          <ListItemIcon>
+            <SettingsIcon fontSize="small" />
+          </ListItemIcon>
+          Configuración
+        </MenuItem>
+        
+        <Divider />
+        
+        <MenuItem onClick={handleLogout}>
+          <ListItemIcon>
+            <LogoutIcon fontSize="small" />
+          </ListItemIcon>
+          Cerrar sesión
+        </MenuItem>
+      </Menu>
+      
+      {/* Menú de Notificaciones */}
+      <Menu
+        anchorEl={notificationsAnchorEl}
+        open={openNotificationsMenu}
+        onClose={handleNotificationsClose}
+        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+        PaperProps={{
+          elevation: 2,
+          sx: {
+            mt: 1.5,
+            borderRadius: 2,
+            minWidth: 300,
+            maxHeight: 400,
+          },
+        }}
+      >
+        <Box sx={{ px: 2, py: 1 }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+            Notificaciones
+          </Typography>
+        </Box>
+        
+        <Divider />
+        
+        <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
+          <MenuItem onClick={() => { handleNotificationsClose(); navigate('/mensajes'); }}>
+            <Box sx={{ py: 1 }}>
+              <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                Nuevo mensaje recibido
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Hace 5 minutos
+              </Typography>
+            </Box>
+          </MenuItem>
+          
+          <MenuItem onClick={() => { handleNotificationsClose(); navigate('/calificaciones'); }}>
+            <Box sx={{ py: 1 }}>
+              <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                Nueva calificación registrada
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Hace 2 horas
+              </Typography>
+            </Box>
+          </MenuItem>
+        </Box>
+        
+        <Divider />
+        
+        <MenuItem onClick={() => { handleNotificationsClose(); navigate('/notificaciones'); }}>
+          <Typography variant="body2" align="center" color="primary" sx={{ width: '100%' }}>
+            Ver todas las notificaciones
+          </Typography>
+        </MenuItem>
+      </Menu>
     </Box>
   );
 };

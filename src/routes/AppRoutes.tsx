@@ -1,65 +1,70 @@
-// src/routes/AppRoutes.tsx (actualizado con todas las rutas, incluyendo usuarios)
+// src/routes/AppRoutes.tsx
 import React from 'react';
-import { Route, Routes, Navigate } from 'react-router-dom';
-import { isAuthenticated } from '../services/authService';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
+import { RootState } from '../redux/store';
 
-// Páginas
-import Login from '../pages/auth/Login';
-import Register from '../pages/auth/Register';
-import Dashboard from '../pages/dashboard/Dashboard';
+// Layouts
 import MainLayout from '../components/layout/MainLayout';
 
-// Mensajería
+// Página de configuración inicial
+import SetupPage from '../pages/system/SetupPage';
+
+// Páginas públicas
+import Login from '../pages/auth/Login';
+import Register from '../pages/auth/Register';
+
+// Páginas protegidas
+import Dashboard from '../pages/dashboard/Dashboard';
 import MensajesLayout from '../pages/mensajes/MensajesLayout';
 import ListaMensajes from '../pages/mensajes/ListaMensajes';
-import DetalleMensaje from '../pages/mensajes/DetalleMensaje';
 import NuevoMensaje from '../pages/mensajes/NuevoMensaje';
-
-// Calificaciones
-import CalificacionesLayout from '../pages/calificaciones/CalificacionesLayout';
-import ListaCalificaciones from '../pages/calificaciones/ListaCalificaciones';
-import DetalleCalificacion from '../pages/calificaciones/DetalleCalificacion';
-import EditarCalificacion from '../pages/calificaciones/EditarCalificacion';
-import Boletin from '../pages/calificaciones/Boletin';
-import Estadisticas from '../pages/calificaciones/Estadisticas';
-
-// Usuarios (módulo nuevo)
+import DetalleMensaje from '../pages/mensajes/DetalleMensaje';
+import EditarBorrador from '../pages/mensajes/EditarBorrador';
 import ListaUsuarios from '../pages/usuarios/ListaUsuarios';
 import DetalleUsuario from '../pages/usuarios/DetalleUsuario';
-import FormularioUsuario from '../pages/usuarios/FormularioUsuario';
 import CambiarPassword from '../pages/usuarios/CambiarPassword';
+import ListaCursos from '../pages/cursos/ListaCursos';
+import DetalleCurso from '../pages/cursos/DetalleCurso';
+import FormularioCurso from '../pages/cursos/FormularioCurso';
+import PerfilUsuario from '../pages/perfil/PerfilUsuario';
+import EditarPerfil from '../pages/perfil/EditarPerfil';
+import PerfilCambiarPassword from '../pages/perfil/PerfilCambiarPassword';
+import ListaEscuelas from '../pages/escuelas/ListaEscuelas';
+import DetalleEscuela from '../pages/escuelas/DetalleEscuela';
+import FormularioEscuela from '../pages/escuelas/FormularioEscuela';
+import ConfiguracionSistema from '../pages/configuracion/ConfiguracionSistema';
+import CalendarioEscolar from '../pages/calendario/CalendarioEscolar';
+import AgregarEstudianteCurso from '../pages/cursos/AgregarEstudianteCurso';
+import AgregarAsignaturaCurso from '../pages/cursos/AgregarAsignaturaCurso';
 
-// Cursos
-import {
-  ListaCursos,
-  DetalleCurso,
-  FormularioCurso,
-  AgregarEstudianteCurso,
-  AgregarAsignaturaCurso
-} from '../pages/cursos';
+import { 
+  ListaAsistencia, 
+  RegistroAsistencia, 
+  DetalleAsistencia 
+} from '../pages/asistencia';
 
-// Perfil
-import {
-  PerfilUsuario,
-  EditarPerfil,
-  PerfilCambiarPassword
-} from '../pages/perfil';
+import { ROLES_CON_BORRADORES } from '../types/mensaje.types';
+import { ListaAnuncios, DetalleAnuncio, FormularioAnuncio } from '../pages/anuncios';
+//import { FormularioEvento } from '../pages/calendario';
+import FormularioEvento from '../pages/calendario/FormularioEvento';
+import DirectForm from '../pages/calendario/DirectForm';
 
-// Logros
-import {
-  ListaLogros,
-  DetalleLogro,
-  FormularioLogro
-} from '../pages/logros';
+// Componente para rutas protegidas
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+  allowedRoles?: string[];
+}
 
-// Otras páginas
-import NotFound from '../pages/NotFound';
-
-// Rutas protegidas
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  if (!isAuthenticated()) {
-    // Redirigir al login si no está autenticado
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles = [] }) => {
+  const { isAuthenticated, user } = useSelector((state: RootState) => state.auth);
+  
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+  
+  if (allowedRoles.length > 0 && !allowedRoles.includes(user?.tipo || '')) {
+    return <Navigate to="/" replace />;
   }
   
   return <>{children}</>;
@@ -68,6 +73,9 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 const AppRoutes = () => {
   return (
     <Routes>
+      {/* Ruta de configuración inicial */}
+      <Route path="/setup" element={<SetupPage />} />
+      
       {/* Rutas públicas */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
@@ -80,60 +88,199 @@ const AppRoutes = () => {
       }>
         <Route index element={<Dashboard />} />
         
-        {/* Rutas de mensajería */}
+        {/* Rutas de mensajería con estados independientes */}
         <Route path="mensajes" element={<MensajesLayout />}>
-          <Route index element={<Navigate to="/mensajes/recibidos" replace />} />
+          <Route index element={<Navigate to="recibidos" replace />} />
           <Route path="recibidos" element={<ListaMensajes />} />
-          <Route path="enviados" element={<ListaMensajes />} />
-          <Route path="borradores" element={<ListaMensajes />} />
-          <Route path="archivados" element={<ListaMensajes />} />
+          
+          {/* Restringir enviados para estudiantes */}
+          <Route path="enviados" element={
+            <ProtectedRoute allowedRoles={['ADMIN', 'DOCENTE', 'PADRE', 'ACUDIENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO']}>
+              <ListaMensajes />
+            </ProtectedRoute>
+          } />
+          
+          {/* Restringir borradores para roles específicos */}
+          <Route path="borradores" element={
+            <ProtectedRoute allowedRoles={ROLES_CON_BORRADORES}>
+              <ListaMensajes />
+            </ProtectedRoute>
+          } />
+          
+          {/* Edición de borradores */}
+          <Route path="borradores/editar/:id" element={
+            <ProtectedRoute allowedRoles={ROLES_CON_BORRADORES}>
+              <EditarBorrador />
+            </ProtectedRoute>
+          } />
+          
+          {/* Nuevo borrador */}
+          <Route path="borradores/nuevo" element={
+            <ProtectedRoute allowedRoles={ROLES_CON_BORRADORES}>
+              <EditarBorrador />
+            </ProtectedRoute>
+          } />
+          
+          {/* Archivados */}
+          <Route path="archivados" element={
+            <ProtectedRoute allowedRoles={['ADMIN', 'DOCENTE', 'ESTUDIANTE','PADRE', 'ACUDIENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO']}>
+              <ListaMensajes />
+            </ProtectedRoute>
+          } />
+          
+          {/* Eliminados (accesible para todos) */}
+          <Route path="eliminados" element={<ListaMensajes />} />
+          
+          {/* Restringir nuevo mensaje para estudiantes */}
+          <Route path="nuevo" element={
+            <ProtectedRoute allowedRoles={['ADMIN', 'DOCENTE', 'PADRE', 'ACUDIENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO']}>
+              <NuevoMensaje />
+            </ProtectedRoute>
+          } />
+          
+          {/* Restringir responder mensaje para estudiantes */}
+          <Route path="responder/:id" element={
+            <ProtectedRoute allowedRoles={['ADMIN', 'DOCENTE', 'PADRE', 'ACUDIENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO']}>
+              <NuevoMensaje />
+            </ProtectedRoute>
+          } />
+          
+          <Route path=":id" element={<DetalleMensaje />} />
         </Route>
-        <Route path="mensajes/nuevo" element={<NuevoMensaje />} />
-        <Route path="mensajes/responder/:id" element={<NuevoMensaje />} />
-        <Route path="mensajes/:id" element={<DetalleMensaje />} />
         
-        {/* Rutas de calificaciones */}
-        <Route path="calificaciones" element={<CalificacionesLayout />}>
-          <Route index element={<Navigate to="/calificaciones/lista" replace />} />
-          <Route path="lista" element={<ListaCalificaciones />} />
-          <Route path="boletin" element={<Boletin />} />
-          <Route path="estadisticas" element={<Estadisticas />} />
-        </Route>
-        <Route path="calificaciones/:id" element={<DetalleCalificacion />} />
-        <Route path="calificaciones/editar/:id" element={<EditarCalificacion />} />
-        <Route path="calificaciones/nueva" element={<EditarCalificacion />} />
+        {/* Resto de rutas existentes */}
+        <Route path="usuarios" element={
+          <ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO']}>
+            <ListaUsuarios />
+          </ProtectedRoute>
+        } />
         
-        {/* Rutas de administración de usuarios */}
-        <Route path="usuarios" element={<ListaUsuarios />} />
-        <Route path="usuarios/nuevo" element={<FormularioUsuario />} />
-        <Route path="usuarios/editar/:id" element={<FormularioUsuario />} />
-        <Route path="usuarios/:id" element={<DetalleUsuario />} />
-        <Route path="usuarios/:id/cambiar-password" element={<CambiarPassword />} />
+        {/* ... (resto del código existente permanece igual) ... */}
+        <Route path="usuarios/nuevo" element={
+          <ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO']}>
+            <DetalleUsuario />
+          </ProtectedRoute>
+        } />
+        <Route path="usuarios/:id" element={
+          <ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO']}>
+            <DetalleUsuario />
+          </ProtectedRoute>
+        } />
+        <Route path="usuarios/:id/cambiar-password" element={
+          <ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO']}>
+            <CambiarPassword />
+          </ProtectedRoute>
+        } />
         
-        {/* Rutas de gestión de cursos */}
-        <Route path="cursos" element={<ListaCursos />} />
-        <Route path="cursos/nuevo" element={<FormularioCurso />} />
-        <Route path="cursos/editar/:id" element={<FormularioCurso />} />
-        <Route path="cursos/:id" element={<DetalleCurso />} />
-        <Route path="cursos/:id/estudiantes/agregar" element={<AgregarEstudianteCurso />} />
-        <Route path="cursos/:id/asignaturas/agregar" element={<AgregarAsignaturaCurso />} />
+        {/* Rutas de cursos */}
+        <Route path="cursos" element={
+          <ProtectedRoute allowedRoles={['ADMIN', 'DOCENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO']}>
+            <ListaCursos />
+          </ProtectedRoute>
+        } />
+        <Route path="cursos/:id" element={
+          <ProtectedRoute allowedRoles={['ADMIN', 'DOCENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO']}>
+            <DetalleCurso />
+          </ProtectedRoute>
+        } />
+        <Route path="cursos/nuevo" element={
+          <ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO']}>
+            <FormularioCurso />
+          </ProtectedRoute>
+        } />
+        <Route path="cursos/editar/:id" element={
+          <ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO']}>
+            <FormularioCurso />
+          </ProtectedRoute>
+        } />
+        <Route path="cursos/:id/estudiantes/agregar" element={
+          <ProtectedRoute allowedRoles={['ADMIN', 'DOCENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO']}>
+            <AgregarEstudianteCurso />
+          </ProtectedRoute>
+        } />
+        <Route path="cursos/:id/asignaturas/agregar" element={
+          <ProtectedRoute allowedRoles={['ADMIN', 'DOCENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO']}>
+            <AgregarAsignaturaCurso />
+          </ProtectedRoute>
+        } />
         
-        {/* Rutas de perfil de usuario */}
+        {/* Rutas de perfil */}
         <Route path="perfil" element={<PerfilUsuario />} />
         <Route path="perfil/editar" element={<EditarPerfil />} />
         <Route path="perfil/cambiar-password" element={<PerfilCambiarPassword />} />
         
-        {/* Rutas de gestión de logros académicos */}
-        <Route path="logros" element={<ListaLogros />} />
-        <Route path="logros/nuevo" element={<FormularioLogro />} />
-        <Route path="logros/editar/:id" element={<FormularioLogro />} />
-        <Route path="logros/:id" element={<DetalleLogro />} />
+        {/* Rutas de escuelas (solo admin y roles administrativos) */}
+        <Route path="escuelas" element={
+          <ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO']}>
+            <ListaEscuelas />
+          </ProtectedRoute>
+        } />
+        <Route path="escuelas/:id" element={
+          <ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO']}>
+            <DetalleEscuela />
+          </ProtectedRoute>
+        } />
+        <Route path="escuelas/nueva" element={
+          <ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'RECTOR']}>
+            <FormularioEscuela />
+          </ProtectedRoute>
+        } />
+        <Route path="escuelas/editar/:id" element={
+          <ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'RECTOR']}>
+            <FormularioEscuela />
+          </ProtectedRoute>
+        } />
         
-        {/* Aquí irán más rutas de otros módulos */}
+        {/* Calendario escolar */}
+        <Route path="calendario" element={<CalendarioEscolar />} />
+        <Route path="/calendario/nuevo" element={<FormularioEvento />} />
+        <Route path="/calendario/editar/:id" element={<FormularioEvento />} />
+        {/* <Route path="/calendario/:id" element={<DetalleEvento />} /> */}
+        
+        <Route path="/anuncios" element={<ListaAnuncios />} />
+        <Route path="/anuncios/:id" element={<DetalleAnuncio />} />
+        <Route path="/anuncios/nuevo" element={<FormularioAnuncio />} />
+        <Route path="/anuncios/editar/:id" element={<FormularioAnuncio />} />
+
+        {/* Configuración */}
+        <Route path="configuracion" element={
+          <ProtectedRoute allowedRoles={['ADMIN', 'COORDINADOR', 'RECTOR']}>
+            <ConfiguracionSistema />
+          </ProtectedRoute>
+        } />
+        
+        {/* Asistencia */}
+        <Route path="asistencia" element={
+          <ProtectedRoute allowedRoles={['ADMIN', 'DOCENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO']}>
+            <ListaAsistencia />
+          </ProtectedRoute>
+        } />
+        <Route path="asistencia/registro" element={
+          <ProtectedRoute allowedRoles={['ADMIN', 'DOCENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO']}>
+            <RegistroAsistencia />
+          </ProtectedRoute>
+        } />
+        <Route path="asistencia/:id" element={
+          <ProtectedRoute allowedRoles={['ADMIN', 'DOCENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO']}>
+            <DetalleAsistencia />
+          </ProtectedRoute>
+        } />
+        <Route path="asistencia/editar/:id" element={
+          <ProtectedRoute allowedRoles={['ADMIN', 'DOCENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO']}>
+            <RegistroAsistencia />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/calendario/test-form" element={
+          <ProtectedRoute>
+            <DirectForm />
+          </ProtectedRoute>
+        } />
+
+
+        {/* Ruta para redireccionar a 404 o al dashboard */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
-      
-      {/* Ruta para página no encontrada */}
-      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 };

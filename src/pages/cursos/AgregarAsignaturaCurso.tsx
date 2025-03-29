@@ -40,6 +40,7 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../../redux/store';
 import { Formik, Form, Field } from 'formik';
 import * as Yup from 'yup';
+import AgregarAsignaturaDirecta from './AgregarAsignaturaDirecta'; // Importar el componente alternativo
 
 // Interfaces
 interface Asignatura {
@@ -47,6 +48,10 @@ interface Asignatura {
   nombre: string;
   codigo: string;
   creditos: number;
+  descripcion?: string;
+  intensidadHoraria?: number;
+  periodos?: string[];
+  cursoId?: string;
   docente: string | {
     _id: string;
     nombre: string;
@@ -58,6 +63,7 @@ interface Docente {
   _id: string;
   nombre: string;
   apellidos: string;
+  tipo: string;
 }
 
 interface AsignaturaSeleccionada {
@@ -66,6 +72,8 @@ interface AsignaturaSeleccionada {
   nombre: string;
   codigo: string;
   creditos: number;
+  descripcion?: string;
+  intensidadHoraria?: number;
   docenteNombre?: string;
 }
 
@@ -85,7 +93,29 @@ const asignaturaSchema = Yup.object().shape({
     .required('Los créditos son requeridos')
     .min(1, 'Debe ser al menos 1')
     .max(10, 'No debe exceder 10'),
+  descripcion: Yup.string()
+    .required('La descripción es requerida')
+    .min(10, 'La descripción debe tener al menos 10 caracteres'),
+  intensidadHoraria: Yup.number()
+    .required('La intensidad horaria es requerida')
+    .min(1, 'Debe ser al menos 1 hora'),
   docenteId: Yup.string().required('El docente es requerido'),
+  porcentajeExamenes: Yup.number()
+    .required('El porcentaje de exámenes es requerido')
+    .min(0, 'No puede ser un valor negativo')
+    .max(100, 'No debe exceder 100%'),
+  porcentajeTareas: Yup.number()
+    .required('El porcentaje de tareas es requerido')
+    .min(0, 'No puede ser un valor negativo')
+    .max(100, 'No debe exceder 100%'),
+  porcentajeParticipacion: Yup.number()
+    .required('El porcentaje de participación es requerido')
+    .min(0, 'No puede ser un valor negativo')
+    .max(100, 'No debe exceder 100%'),
+  porcentajeProyectos: Yup.number()
+    .required('El porcentaje de proyectos es requerido')
+    .min(0, 'No puede ser un valor negativo')
+    .max(100, 'No debe exceder 100%'),
 });
 
 const AgregarAsignaturaCurso = () => {
@@ -162,7 +192,11 @@ const AgregarAsignaturaCurso = () => {
       });
       
       if (response.data?.success) {
-        setDocentes(response.data.data || []);
+        // Filtrar explícitamente solo usuarios con tipo DOCENTE
+        const docentesFiltrados = (response.data.data || []).filter(
+          (usuario: Docente) => usuario.tipo === 'DOCENTE'
+        );
+        setDocentes(docentesFiltrados);
       }
     } catch (err: any) {
       console.error('Error al cargar docentes:', err);
@@ -186,7 +220,9 @@ const AgregarAsignaturaCurso = () => {
             docenteId: docenteActual,
             nombre: asignaturaActual.nombre,
             codigo: asignaturaActual.codigo,
-            creditos: asignaturaActual.creditos,
+            creditos: asignaturaActual.creditos || 0,
+            descripcion: asignaturaActual.descripcion,
+            intensidadHoraria: asignaturaActual.intensidadHoraria,
             docenteNombre: docenteSeleccionado ? `${docenteSeleccionado.nombre} ${docenteSeleccionado.apellidos}` : undefined
           }
         ]);
@@ -200,46 +236,105 @@ const AgregarAsignaturaCurso = () => {
     setAsignaturasSeleccionadas(asignaturasSeleccionadas.filter(a => a.asignaturaId !== asignaturaId));
   };
 
-  const handleGuardar = async () => {
-    if (!id || asignaturasSeleccionadas.length === 0) return;
+  // CORREGIDO: Método para guardar asignaturas
+  // Método corregido para AgregarAsignaturaCurso.tsx
 
-    try {
-      setSavingLoading(true);
-      setError(null);
-      setSuccess(null);
+// CORREGIDO: Método para guardar asignaturas usando métodos individuales
+const handleGuardar = async () => {
+  if (!id || asignaturasSeleccionadas.length === 0) return;
 
-      // Añadir cada asignatura al curso
-      for (const asignatura of asignaturasSeleccionadas) {
-        await cursoService.añadirAsignaturaCurso(id, {
-          asignaturaId: asignatura.asignaturaId,
+  try {
+    setSavingLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    // Contador de éxitos
+    let exitosos = 0;
+    let errores = 0;
+
+    // Procesar una asignatura a la vez
+    for (const asignatura of asignaturasSeleccionadas) {
+      try {
+        console.log(`Asignando asignatura ${asignatura.asignaturaId} al curso ${id}`);
+        
+        // Actualizar la asignatura directamente para asignarle el curso
+        const response = await axiosInstance.put(`/asignaturas/${asignatura.asignaturaId}`, {
+          cursoId: id,
           docenteId: asignatura.docenteId
         });
+        
+        if (response.data?.success) {
+          exitosos++;
+        } else {
+          errores++;
+          console.warn('Respuesta inesperada del servidor:', response.data);
+        }
+      } catch (asignaturaError) {
+        errores++;
+        console.error(`Error asignando asignatura ${asignatura.asignaturaId}:`, asignaturaError);
       }
+    }
 
-      setSuccess(`${asignaturasSeleccionadas.length} asignatura(s) añadida(s) exitosamente al curso`);
+    // Determinar mensaje apropiado basado en resultados
+    if (exitosos > 0) {
+      setSuccess(`${exitosos} asignatura(s) añadida(s) exitosamente al curso${errores > 0 ? ` (${errores} con errores)` : ''}`);
       setAsignaturasSeleccionadas([]);
       
       // Recargar la lista de asignaturas disponibles
       await cargarAsignaturas();
-      
-    } catch (err: any) {
-      console.error('Error al añadir asignaturas:', err);
-      setError(err.response?.data?.message || 'No se pudieron agregar las asignaturas al curso');
-    } finally {
-      setSavingLoading(false);
+    } else {
+      setError(`No se pudo agregar ninguna asignatura al curso. Por favor, intente de nuevo.`);
     }
-  };
+  } catch (err) {
+    console.error('Error general al añadir asignaturas:', err);
+    setError('Error al procesar la solicitud. Por favor, intente de nuevo.');
+  } finally {
+    setSavingLoading(false);
+  }
+};
 
   const handleSubmitNewAsignatura = async (values: any, { resetForm }: any) => {
     try {
       setSavingLoading(true);
       setError(null);
+      
+      // Asegurarse de que los valores numéricos sean números y no strings
+      const processedValues = {
+        ...values,
+        creditos: Number(values.creditos),
+        intensidadHoraria: Number(values.intensidadHoraria),
+        porcentajeExamenes: Number(values.porcentajeExamenes),
+        porcentajeTareas: Number(values.porcentajeTareas),
+        porcentajeParticipacion: Number(values.porcentajeParticipacion),
+        porcentajeProyectos: Number(values.porcentajeProyectos),
+        escuelaId: user?.escuelaId,
+        cursoId: id,  // Incluir el ID del curso actual
+        periodos: []  // Array vacío para periodos
+      };
+      
+      // Verificar que la intensidad horaria es al menos 1
+      if (processedValues.intensidadHoraria < 1) {
+        setError('La intensidad horaria debe ser al menos 1 hora');
+        return;
+      }
+      
+      // Verificar que los porcentajes suman exactamente 100%
+      const sumaPorcentajes = 
+        processedValues.porcentajeExamenes + 
+        processedValues.porcentajeTareas + 
+        processedValues.porcentajeParticipacion + 
+        processedValues.porcentajeProyectos;
+        
+      if (sumaPorcentajes !== 100) {
+        setError(`La suma de los porcentajes debe ser 100%. Actualmente: ${sumaPorcentajes.toFixed(2)}%`);
+        setSavingLoading(false);
+        return;
+      }
+
+      console.log('Enviando datos al servidor:', processedValues);
 
       // Crear la nueva asignatura
-      const response = await axiosInstance.post('/asignaturas', {
-        ...values,
-        escuelaId: user?.escuelaId
-      });
+      const response = await axiosInstance.post('/asignaturas', processedValues);
 
       if (response.data?.success) {
         // Agregar la asignatura recién creada a la lista de seleccionadas
@@ -253,7 +348,9 @@ const AgregarAsignaturaCurso = () => {
             docenteId: values.docenteId,
             nombre: nuevaAsignatura.nombre,
             codigo: nuevaAsignatura.codigo,
-            creditos: nuevaAsignatura.creditos,
+            creditos: Number(values.creditos),
+            descripcion: nuevaAsignatura.descripcion,
+            intensidadHoraria: Number(values.intensidadHoraria),
             docenteNombre: docenteSeleccionado ? `${docenteSeleccionado.nombre} ${docenteSeleccionado.apellidos}` : undefined
           }
         ]);
@@ -465,134 +562,41 @@ const AgregarAsignaturaCurso = () => {
                   )}
                 </>
               ) : (
-                // Formulario para crear nueva asignatura
-                <Formik
-                  initialValues={{
-                    nombre: '',
-                    codigo: '',
-                    creditos: 1,
-                    docenteId: '',
+                // Formulario alternativo para crear nueva asignatura
+                <AgregarAsignaturaDirecta 
+                  cursoId={id || ''}
+                  escuelaId={user?.escuelaId || ''}
+                  docentes={docentes}
+                  onSuccess={(nuevaAsignatura) => {
+                    console.log('Datos recibidos de nueva asignatura:', nuevaAsignatura);
+                    // Buscar el docente seleccionado
+                    const docenteSeleccionado = docentes.find(d => d._id === nuevaAsignatura.docenteId);
+                    
+                    // Agregar la nueva asignatura a las seleccionadas
+                    // Aquí tomamos directamente los valores como vienen, sin intentar convertirlos
+                    setAsignaturasSeleccionadas([
+                      ...asignaturasSeleccionadas, 
+                      {
+                        asignaturaId: nuevaAsignatura._id,
+                        docenteId: nuevaAsignatura.docenteId,
+                        nombre: nuevaAsignatura.nombre,
+                        codigo: nuevaAsignatura.codigo,
+                        creditos: nuevaAsignatura.creditos, // Ya viene como número desde AgregarAsignaturaDirecta
+                        descripcion: nuevaAsignatura.descripcion,
+                        intensidadHoraria: nuevaAsignatura.intensidadHoraria,
+                        docenteNombre: docenteSeleccionado ? 
+                          `${docenteSeleccionado.nombre} ${docenteSeleccionado.apellidos}` : 
+                          'Docente seleccionado'
+                      }
+                    ]);
+                    
+                    // Recargar asignaturas y cerrar el formulario
+                    cargarAsignaturas();
+                    setShowNewAsignaturaForm(false);
+                    setSuccess('Asignatura creada y añadida exitosamente');
                   }}
-                  validationSchema={asignaturaSchema}
-                  onSubmit={handleSubmitNewAsignatura}
-                >
-                  {({ errors, touched, values, handleChange, handleBlur, isSubmitting }) => (
-                    <Form>
-                      <Grid container spacing={2}>
-                        <Grid item xs={12}>
-                          <Field
-                            as={TextField}
-                            name="nombre"
-                            label="Nombre de la Asignatura"
-                            fullWidth
-                            variant="outlined"
-                            error={touched.nombre && Boolean(errors.nombre)}
-                            helperText={touched.nombre && errors.nombre}
-                            InputProps={{
-                              sx: { borderRadius: 2 }
-                            }}
-                          />
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                          <Field
-                            as={TextField}
-                            name="codigo"
-                            label="Código"
-                            fullWidth
-                            variant="outlined"
-                            error={touched.codigo && Boolean(errors.codigo)}
-                            helperText={touched.codigo && errors.codigo}
-                            InputProps={{
-                              sx: { borderRadius: 2 }
-                            }}
-                          />
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                          <Field
-                            as={TextField}
-                            name="creditos"
-                            label="Créditos"
-                            type="number"
-                            fullWidth
-                            variant="outlined"
-                            InputProps={{
-                              inputProps: { min: 1, max: 10 },
-                              sx: { borderRadius: 2 }
-                            }}
-                            error={touched.creditos && Boolean(errors.creditos)}
-                            helperText={touched.creditos && errors.creditos}
-                          />
-                        </Grid>
-                        <Grid item xs={12}>
-                          <FormControl
-                            fullWidth
-                            error={touched.docenteId && Boolean(errors.docenteId)}
-                            variant="outlined"
-                          >
-                            <InputLabel id="docente-id-label">Docente</InputLabel>
-                            <Select
-                              labelId="docente-id-label"
-                              id="docenteId"
-                              name="docenteId"
-                              value={values.docenteId}
-                              onChange={handleChange}
-                              onBlur={handleBlur}
-                              label="Docente"
-                              sx={{ borderRadius: 2 }}
-                            >
-                              <MenuItem value="">
-                                <em>Seleccione un docente</em>
-                              </MenuItem>
-                              {docentes.map((docente) => (
-                                <MenuItem key={docente._id} value={docente._id}>
-                                  {docente.nombre} {docente.apellidos}
-                                </MenuItem>
-                              ))}
-                            </Select>
-                            <FormHelperText>{touched.docenteId && errors.docenteId}</FormHelperText>
-                          </FormControl>
-                        </Grid>
-                        <Grid item xs={12}>
-                          <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
-                            <Button
-                              type="button"
-                              variant="outlined"
-                              color="inherit"
-                              onClick={() => setShowNewAsignaturaForm(false)}
-                              sx={{ 
-                                borderRadius: 20,
-                                flex: 1
-                              }}
-                            >
-                              Cancelar
-                            </Button>
-                            <Button
-                              type="submit"
-                              variant="contained"
-                              color="primary"
-                              disabled={isSubmitting}
-                              sx={{ 
-                                borderRadius: 20,
-                                fontWeight: 500,
-                                boxShadow: 'none',
-                                flex: 1,
-                                '&:hover': {
-                                  boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.1)'
-                                }
-                              }}
-                            >
-                              {isSubmitting ? (
-                                <CircularProgress size={24} color="inherit" />
-                              ) : (
-                                'Crear y Agregar'
-                              )}
-                            </Button>
-                          </Box>
-                        </Grid>
-                      </Grid>
-                    </Form>
-                  )}
-                </Formik>
+                  onCancel={() => setShowNewAsignaturaForm(false)}
+                />
               )}
             </Box>
           </Paper>
@@ -639,7 +643,7 @@ const AgregarAsignaturaCurso = () => {
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                               {asignatura.nombre}
                               <Chip 
-                                label={`${asignatura.creditos} créditos`} 
+                                label={`${asignatura.creditos || 0} créditos`} 
                                 size="small" 
                                 color="primary" 
                                 sx={{ borderRadius: 8 }}

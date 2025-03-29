@@ -5,171 +5,317 @@ import {
   Box,
   Typography,
   Paper,
-  Grid,
-  Card,
-  CardContent,
   Button,
   TextField,
   InputAdornment,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  IconButton,
+  Chip,
+  Grid,
   CircularProgress,
   Alert,
-  Chip,
-  IconButton,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
-  Pagination,
+  Snackbar,
+  Tooltip,
 } from '@mui/material';
 import {
-  Add,
-  Search,
-  Refresh,
-  Edit,
-  Delete,
-  School,
-  Group,
-  MenuBook,
-  Person,
-  FilterList,
+  Search as SearchIcon,
+  Add as AddIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  Visibility as VisibilityIcon,
+  Close as CloseIcon,
 } from '@mui/icons-material';
 import axiosInstance from '../../api/axiosConfig';
-import { useSelector } from 'react-redux';
-import { RootState } from '../../redux/store';
 
-// Interfaz para el curso
+// Función de utilidad para extraer el nombre del usuario de forma segura
+const extractUserName = (user: any): string => {
+  if (!user) return 'No asignado';
+  if (typeof user === 'string') return user;
+  if (typeof user !== 'object') return String(user);
+  
+  return user.nombre 
+    ? (user.apellidos ? `${user.nombre} ${user.apellidos}` : user.nombre)
+    : 'Usuario asignado';
+};
+
+// Función para extraer información de grado y sección del curso
+const extractGradoSeccion = (curso: Curso): string => {
+  // Si el curso tiene propiedades específicas para grado y grupo, usarlas
+  if (curso.grado && curso.grupo) {
+    // No añadir "°" para casos especiales como "Jardín"
+    const esGradoNumerico = /^\d+$/.test(curso.grado.replace('°', ''));
+    const gradoFormateado = esGradoNumerico && !curso.grado.includes('°') 
+      ? `${curso.grado}°` 
+      : curso.grado;
+    
+    return `${gradoFormateado} ${curso.grupo}`;
+  }
+  
+  // Si no, intentar extraer del nombre del curso (Ej: "Primero A" -> "1° A")
+  const nombreParts = curso.nombre.split(' ');
+  if (nombreParts.length >= 2) {
+    // Intentar convertir nombres textuales a números
+    const gradoMap: {[key: string]: string} = {
+      'primero': '1°',
+      'segundo': '2°',
+      'tercero': '3°',
+      'cuarto': '4°',
+      'quinto': '5°',
+      'sexto': '6°',
+      'séptimo': '7°',
+      'octavo': '8°',
+      'noveno': '9°',
+      'décimo': '10°',
+      'once': '11°',
+      'doce': '12°',
+      'jardin': 'Jardín',
+      'jardín': 'Jardín',
+      'prejardin': 'Pre-Jardín',
+      'prejardín': 'Pre-Jardín',
+      'transicion': 'Transición',
+      'transición': 'Transición'
+    };
+    
+    const gradoTextual = nombreParts[0].toLowerCase();
+    const grado = gradoMap[gradoTextual] || nombreParts[0];
+    const seccion = nombreParts[1];
+    
+    return `${grado} ${seccion}`;
+  }
+  
+  // Para casos donde el nombre es solo una palabra (ej: "JARDIN")
+  if (curso.nombre && curso.grupo) {
+    return `${curso.nombre} ${curso.grupo}`;
+  }
+  
+  return curso.nombre; // Si no se puede extraer, devolver el nombre completo
+};
+
 interface Curso {
   _id: string;
   nombre: string;
-  año_academico: string;
-  grado: string;
-  grupo: string;
-  director_grupo: {
-    _id: string;
-    nombre: string;
-    apellidos: string;
-  };
+  nivel: string;
+  grado?: string;   // Propiedad opcional para grado
+  grupo?: string;   // Propiedad opcional para grupo/sección
+  jornada?: string; // Propiedad opcional para jornada
+  año_academico?: string;
+  capacidad?: number;
+  estudiantes?: any[];
+  director_grupo?: any;
   estado: string;
-  escuelaId: string;
-  estudiantes_count?: number;
-  asignaturas_count?: number;
-  createdAt?: string;
 }
 
-const ListaCursos = () => {
+const ListaCursos: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useSelector((state: RootState) => state.auth);
   const [cursos, setCursos] = useState<Curso[]>([]);
+  const [filteredCursos, setFilteredCursos] = useState<Curso[]>([]);
+  const [busqueda, setBusqueda] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState<string>('');
-  const [page, setPage] = useState<number>(1);
-  const [totalPages, setTotalPages] = useState<number>(1);
-  const [refreshKey, setRefreshKey] = useState<number>(0);
-  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; cursoId: string | null }>({
-    open: false,
-    cursoId: null,
-  });
-
-  const itemsPerPage = 9; // Mostrar 9 tarjetas por página (3x3 grid)
+  const [networkError, setNetworkError] = useState<boolean>(false);
+  const [demoMode, setDemoMode] = useState<boolean>(false);
 
   useEffect(() => {
     cargarCursos();
-  }, [page, refreshKey]);
+  }, []);
+
+  useEffect(() => {
+    // Filtrar cursos cuando cambia la búsqueda
+    if (busqueda.trim() === '') {
+      setFilteredCursos(cursos);
+    } else {
+      const searchTermLower = busqueda.toLowerCase();
+      const filtered = cursos.filter(
+        (curso) =>
+          curso.nombre.toLowerCase().includes(searchTermLower) ||
+          curso.nivel.toLowerCase().includes(searchTermLower) ||
+          (curso.año_academico && curso.año_academico.toLowerCase().includes(searchTermLower)) ||
+          (curso.director_grupo && extractUserName(curso.director_grupo).toLowerCase().includes(searchTermLower))
+      );
+      setFilteredCursos(filtered);
+    }
+  }, [busqueda, cursos]);
 
   const cargarCursos = async () => {
     try {
       setLoading(true);
       setError(null);
-
-      // Configurar parámetros para la paginación
-      const params = {
-        page,
-        limit: itemsPerPage,
-        ...(searchTerm && { q: searchTerm }),
-      };
-
-      const response = await axiosInstance.get('/cursos', { params });
+      setNetworkError(false);
       
-      if (response.data?.success) {
-        setCursos(response.data.data);
-        setTotalPages(Math.ceil(response.data.meta?.total / itemsPerPage) || 1);
-      } else {
-        throw new Error('Error al cargar cursos');
+      try {
+        const response = await axiosInstance.get('/cursos');
+        console.log('Respuesta de API cursos:', response.data);
+        setCursos(response.data.data || []);
+        setFilteredCursos(response.data.data || []);
+        setDemoMode(false);
+      } catch (err: any) {
+        console.error('Error al cargar cursos:', err);
+        
+        // Detectar error de conexión
+        if (err.message && err.message.includes('Network Error')) {
+          setNetworkError(true);
+          setDemoMode(true);
+          
+          // Proporcionar datos de demostración
+          const demoData: Curso[] = [
+            {
+              _id: '1',
+              nombre: 'Primero A',
+              nivel: 'PRIMARIA',
+              año_academico: '2023-2024',
+              capacidad: 30,
+              estudiantes: [],
+              director_grupo: { nombre: 'María', apellidos: 'López' },
+              estado: 'ACTIVO',
+            },
+            {
+              _id: '2',
+              nombre: 'Segundo B',
+              nivel: 'PRIMARIA',
+              año_academico: '2023-2024',
+              capacidad: 25,
+              estudiantes: [],
+              director_grupo: { nombre: 'Juan', apellidos: 'González' },
+              estado: 'ACTIVO',
+            },
+            {
+              _id: '3',
+              nombre: 'Tercero C',
+              nivel: 'PRIMARIA',
+              año_academico: '2023-2024',
+              capacidad: 28,
+              estudiantes: [],
+              director_grupo: { nombre: 'Carlos', apellidos: 'Rodríguez' },
+              estado: 'ACTIVO',
+            },
+            {
+              _id: '4',
+              nombre: 'Noveno A',
+              nivel: 'SECUNDARIA',
+              año_academico: '2023-2024',
+              capacidad: 35,
+              estudiantes: [],
+              director_grupo: { nombre: 'Ana', apellidos: 'Martínez' },
+              estado: 'ACTIVO',
+            },
+            {
+              _id: '5',
+              nombre: 'Décimo B',
+              nivel: 'MEDIA',
+              año_academico: '2023-2024',
+              capacidad: 32,
+              estudiantes: [],
+              director_grupo: { nombre: 'Pedro', apellidos: 'Sánchez' },
+              estado: 'ACTIVO',
+            },
+          ];
+          
+          setCursos(demoData);
+          setFilteredCursos(demoData);
+        } else {
+          setError('Error al cargar la lista de cursos. Intente nuevamente más tarde.');
+        }
       }
-    } catch (err: any) {
-      console.error('Error al cargar cursos:', err);
-      setError(err.response?.data?.message || 'No se pudieron cargar los cursos');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    setPage(1); // Resetear a la primera página al buscar
-    cargarCursos();
+  const handleSearch = () => {
+    console.log("Buscando cursos con término:", busqueda);
   };
 
-  const handlePageChange = (_event: React.ChangeEvent<unknown>, value: number) => {
-    setPage(value);
-  };
-
-  const handleRefresh = () => {
-    setRefreshKey(oldKey => oldKey + 1);
-  };
-
-  const handleDeleteClick = (cursoId: string) => {
-    setDeleteDialog({ open: true, cursoId });
-  };
-
-  const handleDeleteConfirm = async () => {
-    if (!deleteDialog.cursoId) return;
-    
-    try {
-      setLoading(true);
-      const response = await axiosInstance.delete(`/cursos/${deleteDialog.cursoId}`);
-      
-      if (response.data?.success) {
-        // Actualizar la lista de cursos
-        setCursos(cursos.filter(curso => curso._id !== deleteDialog.cursoId));
-      }
-    } catch (err: any) {
-      console.error('Error al eliminar curso:', err);
-      setError(err.response?.data?.message || 'No se pudo eliminar el curso');
-    } finally {
-      setLoading(false);
-      setDeleteDialog({ open: false, cursoId: null });
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSearch();
     }
   };
 
-  const handleDeleteCancel = () => {
-    setDeleteDialog({ open: false, cursoId: null });
+  const handleVerCurso = (id: string) => {
+    navigate(`/cursos/${id}`);
   };
 
-  // Obtener color para el chip de estado
+  const handleEditarCurso = (id: string) => {
+    navigate(`/cursos/editar/${id}`);
+  };
+
+  const handleEliminarCurso = async (id: string) => {
+    if (window.confirm('¿Está seguro de desactivar este curso?')) {
+      try {
+        if (demoMode) {
+          setCursos(prev => 
+            prev.map(curso => 
+              curso._id === id ? { ...curso, estado: 'INACTIVO' } : curso
+            )
+          );
+        } else {
+          await axiosInstance.delete(`/cursos/${id}`);
+          cargarCursos();
+        }
+      } catch (err) {
+        console.error('Error al eliminar curso:', err);
+        setError('Error al desactivar curso. Intente nuevamente más tarde.');
+      }
+    }
+  };
+
+  const getNivelLabel = (nivel: string) => {
+    switch (nivel) {
+      case 'PREESCOLAR': return 'Preescolar';
+      case 'PRIMARIA': return 'Primaria';
+      case 'SECUNDARIA': return 'Secundaria';
+      case 'MEDIA': return 'Media';
+      default: return nivel;
+    }
+  };
+
   const getEstadoColor = (estado: string) => {
     switch (estado) {
       case 'ACTIVO': return 'success';
       case 'INACTIVO': return 'error';
-      case 'FINALIZADO': return 'warning';
       default: return 'default';
     }
   };
 
-  // Formatear nombre completo del curso
-  const getNombreCursoCompleto = (curso: Curso) => {
-    return `${curso.grado}° ${curso.grupo} - ${curso.año_academico}`;
+  const handleCloseNetworkError = () => {
+    setNetworkError(false);
+  };
+
+  // Función para contar estudiantes en un curso
+  const contarEstudiantes = (curso: Curso): number => {
+    return Array.isArray(curso.estudiantes) ? curso.estudiantes.length : 0;
   };
 
   return (
     <Box>
-      <Typography variant="h1" color="primary.main" gutterBottom>
-        Gestión de Cursos
-      </Typography>
+      <Grid container spacing={2} alignItems="center" sx={{ mb: 3 }}>
+        <Grid item xs>
+          <Typography variant="h1" color="primary.main">
+            Administración de Cursos
+          </Typography>
+          {demoMode && (
+            <Typography variant="subtitle1" color="text.secondary">
+              Modo demostración - Sin conexión al servidor
+            </Typography>
+          )}
+        </Grid>
+        <Grid item>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => navigate('/cursos/nuevo')}
+            sx={{ borderRadius: '20px' }}
+          >
+            Nuevo Curso
+          </Button>
+        </Grid>
+      </Grid>
 
-      {/* Barra de acciones */}
       <Paper
         elevation={0}
         sx={{
@@ -177,335 +323,201 @@ const ListaCursos = () => {
           mb: 3,
           borderRadius: 3,
           boxShadow: '0px 4px 4px rgba(0, 0, 0, 0.05)',
-          display: 'flex',
-          flexWrap: 'wrap',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: 2,
         }}
       >
-        <Box component="form" onSubmit={handleSearch} sx={{ display: 'flex', alignItems: 'center', flexGrow: 1, maxWidth: 500 }}>
-          <TextField
-            variant="outlined"
-            size="small"
-            placeholder="Buscar cursos..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            sx={{ mr: 1, flexGrow: 1 }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Search color="action" />
-                </InputAdornment>
-              ),
-              sx: { borderRadius: 2 }
-            }}
-          />
-          <Button 
-            type="submit" 
-            variant="contained" 
-            color="primary"
-            sx={{ 
-              borderRadius: 20,
-              px: 3,
-              fontWeight: 500,
-              boxShadow: 'none',
-              '&:hover': {
-                boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.1)'
-              }
-            }}
-          >
-            Buscar
-          </Button>
-        </Box>
-
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button
-            variant="outlined"
-            startIcon={<Refresh />}
-            onClick={handleRefresh}
-            sx={{ 
-              borderRadius: 20,
-              borderColor: 'rgba(0, 0, 0, 0.12)',
-              color: 'text.secondary'
-            }}
-          >
-            Actualizar
-          </Button>
-          <Button
-            variant="contained"
-            color="secondary"
-            startIcon={<Add />}
-            onClick={() => navigate('/cursos/nuevo')}
-            sx={{ 
-              borderRadius: 20,
-              fontWeight: 500,
-              boxShadow: 'none',
-              '&:hover': {
-                boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.1)'
-              }
-            }}
-          >
-            Nuevo Curso
-          </Button>
-        </Box>
+        <Grid container spacing={2} alignItems="center">
+          <Grid item xs>
+            <TextField
+              fullWidth
+              placeholder="Buscar cursos por nombre, nivel o docente..."
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              onKeyPress={handleKeyPress}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+              }}
+              size="small"
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                },
+              }}
+            />
+          </Grid>
+          <Grid item>
+            <Button
+              variant="outlined"
+              onClick={handleSearch}
+              sx={{ borderRadius: '20px' }}
+            >
+              Buscar
+            </Button>
+          </Grid>
+        </Grid>
       </Paper>
 
-      {/* Contenido principal - Grid de cursos */}
-      {loading && cursos.length === 0 ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', my: 5 }}>
-          <CircularProgress />
-        </Box>
-      ) : error ? (
-        <Alert 
-          severity="error" 
-          sx={{ 
+      {error && (
+        <Alert
+          severity="error"
+          sx={{
             mb: 3,
             borderRadius: 2,
             '& .MuiAlert-message': {
-              fontWeight: 500
-            }
+              fontWeight: 500,
+            },
           }}
         >
           {error}
         </Alert>
-      ) : (
-        <>
-          {cursos.length > 0 ? (
-            <Grid container spacing={3}>
-              {cursos.map((curso) => (
-                <Grid item xs={12} sm={6} md={4} key={curso._id}>
-                  <Card 
-                    elevation={0} 
-                    sx={{ 
-                      borderRadius: 3,
-                      overflow: 'hidden',
-                      boxShadow: '0px 4px 4px rgba(0, 0, 0, 0.05)',
-                      height: '100%',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      cursor: 'pointer',
-                      transition: 'transform 0.2s, box-shadow 0.2s',
-                      '&:hover': {
-                        transform: 'translateY(-5px)',
-                        boxShadow: '0px 8px 16px rgba(0, 0, 0, 0.1)'
-                      }
-                    }}
-                    onClick={() => navigate(`/cursos/${curso._id}`)}
-                  >
-                    <Box sx={{ 
-                      bgcolor: 'primary.main', 
-                      color: 'white', 
-                      p: 2,
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center'
-                    }}>
-                      <Typography variant="h3" fontWeight="bold">
-                        {curso.nombre}
-                      </Typography>
-                      <School fontSize="large" />
-                    </Box>
-                    <CardContent sx={{ flexGrow: 1, p: 3 }}>
-                      <Box sx={{ mb: 2 }}>
-                        <Typography variant="body2" color="text.secondary" gutterBottom>
-                          Año académico
-                        </Typography>
-                        <Typography variant="h5" fontWeight="medium">
-                          {curso.año_academico}
-                        </Typography>
-                      </Box>
-                      
-                      <Box sx={{ mb: 2 }}>
-                        <Typography variant="body2" color="text.secondary" gutterBottom>
-                          Grado - Grupo
-                        </Typography>
-                        <Typography variant="h5" fontWeight="medium">
-                          {curso.grado}° - {curso.grupo}
-                        </Typography>
-                      </Box>
-                      
-                      <Box sx={{ mb: 2 }}>
-                        <Typography variant="body2" color="text.secondary" gutterBottom>
-                          Director de grupo
-                        </Typography>
-                        <Typography variant="body1" fontWeight="medium">
-                          {curso.director_grupo ? `${curso.director_grupo.nombre} ${curso.director_grupo.apellidos}` : 'No asignado'}
-                        </Typography>
-                      </Box>
-                      
-                      <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-                        <Chip
-                          label={curso.estado}
-                          color={getEstadoColor(curso.estado) as any}
-                          size="small"
-                          sx={{ fontWeight: 'bold', borderRadius: 8 }}
-                        />
-                      </Box>
-                      
-                      <Grid container spacing={2} sx={{ mt: 1 }}>
-                        <Grid item xs={6}>
-                          <Paper
-                            elevation={0}
-                            sx={{
-                              bgcolor: 'rgba(93, 169, 233, 0.1)',
-                              p: 1.5,
-                              borderRadius: 2,
-                              textAlign: 'center'
-                            }}
-                          >
-                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
-                              <Group fontSize="small" color="primary" sx={{ mr: 0.5 }} />
-                              <Typography variant="body2" color="primary.main">
-                                Estudiantes
-                              </Typography>
-                            </Box>
-                            <Typography variant="h5" fontWeight="bold" color="primary.main">
-                              {curso.estudiantes_count || 0}
-                            </Typography>
-                          </Paper>
-                        </Grid>
-                        <Grid item xs={6}>
-                          <Paper
-                            elevation={0}
-                            sx={{
-                              bgcolor: 'rgba(0, 63, 145, 0.1)',
-                              p: 1.5,
-                              borderRadius: 2,
-                              textAlign: 'center'
-                            }}
-                          >
-                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
-                              <MenuBook fontSize="small" color="secondary" sx={{ mr: 0.5 }} />
-                              <Typography variant="body2" color="secondary.main">
-                                Asignaturas
-                              </Typography>
-                            </Box>
-                            <Typography variant="h5" fontWeight="bold" color="secondary.main">
-                              {curso.asignaturas_count || 0}
-                            </Typography>
-                          </Paper>
-                        </Grid>
-                      </Grid>
-                    </CardContent>
-                    
-                    <Box sx={{ 
-                      display: 'flex', 
-                      justifyContent: 'flex-end',
-                      p: 2,
-                      pt: 0,
-                      mt: 'auto'
-                    }}>
-                      <Box sx={{ display: 'flex', gap: 1 }}>
-                        <IconButton
-                          size="small"
-                          color="secondary"
-                          onClick={(e) => {
-                            e.stopPropagation(); // Evitar la navegación al hacer clic en el botón
-                            navigate(`/cursos/editar/${curso._id}`);
-                          }}
-                          sx={{ 
-                            bgcolor: 'rgba(0, 63, 145, 0.1)',
-                            '&:hover': { bgcolor: 'rgba(0, 63, 145, 0.2)' }
-                          }}
-                        >
-                          <Edit fontSize="small" />
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={(e) => {
-                            e.stopPropagation(); // Evitar la navegación al hacer clic en el botón
-                            handleDeleteClick(curso._id);
-                          }}
-                          sx={{ 
-                            bgcolor: 'rgba(244, 67, 54, 0.1)',
-                            '&:hover': { bgcolor: 'rgba(244, 67, 54, 0.2)' }
-                          }}
-                        >
-                          <Delete fontSize="small" />
-                        </IconButton>
-                      </Box>
-                    </Box>
-                  </Card>
-                </Grid>
-              ))}
-            </Grid>
-          ) : (
-            <Alert 
-              severity="info" 
-              sx={{ 
-                borderRadius: 2,
-                '& .MuiAlert-message': {
-                  fontWeight: 500
-                }
-              }}
-            >
-              No se encontraron cursos. Puedes crear uno nuevo con el botón "Nuevo Curso".
-            </Alert>
-          )}
-          
-          {/* Paginación */}
-          {cursos.length > 0 && (
-            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-              <Pagination
-                count={totalPages}
-                page={page}
-                onChange={handlePageChange}
-                color="primary"
-                sx={{
-                  '& .MuiPaginationItem-root': {
-                    borderRadius: 8,
-                  }
-                }}
-              />
-            </Box>
-          )}
-        </>
       )}
 
-      {/* Diálogo de confirmación para eliminar curso */}
-      <Dialog
-        open={deleteDialog.open}
-        onClose={handleDeleteCancel}
-        PaperProps={{
-          sx: {
-            borderRadius: 3,
-            boxShadow: '0px 8px 24px rgba(0, 0, 0, 0.15)',
-          }
+      <TableContainer
+        component={Paper}
+        elevation={0}
+        sx={{
+          boxShadow: '0px 4px 4px rgba(0, 0, 0, 0.05)',
+          borderRadius: 3,
+          overflow: 'hidden',
         }}
       >
-        <DialogTitle>Confirmar eliminación</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            ¿Está seguro que desea eliminar este curso? Esta acción no se puede deshacer.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions sx={{ p: 2, pt: 0 }}>
-          <Button 
-            onClick={handleDeleteCancel} 
+        <Table>
+          <TableHead sx={{ bgcolor: 'primary.main' }}>
+            <TableRow>
+              <TableCell sx={{ color: 'white', fontWeight: 600 }}>Nombre del Curso</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 600 }}>Grado y Sección</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 600 }}>Nivel</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 600 }}>Año Escolar</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 600 }}>Estudiantes</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 600 }}>Docente Director</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 600 }}>Estado</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 600 }} align="center">
+                Acciones
+              </TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={8} align="center" sx={{ py: 3 }}>
+                  <CircularProgress />
+                </TableCell>
+              </TableRow>
+            ) : filteredCursos.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={8} align="center" sx={{ py: 3 }}>
+                  No se encontraron cursos
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredCursos.map((curso) => (
+                <TableRow
+                  key={curso._id}
+                  sx={{
+                    '&:hover': {
+                      bgcolor: 'rgba(93, 169, 233, 0.05)',
+                    },
+                  }}
+                >
+                  <TableCell sx={{ fontWeight: 500 }}>
+                    {curso.nombre}
+                  </TableCell>
+                  <TableCell>
+                    {extractGradoSeccion(curso)}
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      label={getNivelLabel(curso.nivel)}
+                      color="primary"
+                      variant="outlined"
+                      size="small"
+                      sx={{ fontWeight: 500, borderRadius: 10 }}
+                    />
+                  </TableCell>
+                  <TableCell>{curso.año_academico || 'N/A'}</TableCell>
+                  <TableCell>{contarEstudiantes(curso)}</TableCell>
+                  <TableCell>{extractUserName(curso.director_grupo)}</TableCell>
+                  <TableCell>
+                    <Chip
+                      label={curso.estado}
+                      color={getEstadoColor(curso.estado) as any}
+                      size="small"
+                      sx={{ fontWeight: 500, borderRadius: 10 }}
+                    />
+                  </TableCell>
+                  <TableCell align="center">
+                    <Tooltip title="Ver información del curso" arrow placement="top">
+                      <IconButton
+                        color="primary"
+                        onClick={() => handleVerCurso(curso._id)}
+                        sx={{
+                          mr: 1,
+                          bgcolor: 'rgba(93, 169, 233, 0.1)',
+                          '&:hover': {
+                            bgcolor: 'rgba(93, 169, 233, 0.2)',
+                          },
+                        }}
+                      >
+                        <VisibilityIcon />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Editar información del curso" arrow placement="top">
+                      <IconButton
+                        color="secondary"
+                        onClick={() => handleEditarCurso(curso._id)}
+                        sx={{
+                          mr: 1,
+                          bgcolor: 'rgba(0, 63, 145, 0.1)',
+                          '&:hover': {
+                            bgcolor: 'rgba(0, 63, 145, 0.2)',
+                          },
+                        }}
+                      >
+                        <EditIcon />
+                      </IconButton>
+                    </Tooltip>
+                    {curso.estado === 'ACTIVO' && (
+                      <Tooltip title="Desactivar curso" arrow placement="top">
+                        <IconButton
+                          color="error"
+                          onClick={() => handleEliminarCurso(curso._id)}
+                          sx={{
+                            bgcolor: 'rgba(244, 67, 54, 0.1)',
+                            '&:hover': {
+                              bgcolor: 'rgba(244, 67, 54, 0.2)',
+                            },
+                          }}
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      <Snackbar
+        open={networkError}
+        autoHideDuration={6000}
+        onClose={handleCloseNetworkError}
+        message="Error de conexión con el servidor. Funcionando en modo demo."
+        action={
+          <IconButton
+            size="small"
             color="inherit"
-            sx={{ 
-              borderRadius: 20,
-              px: 3
-            }}
+            onClick={handleCloseNetworkError}
           >
-            Cancelar
-          </Button>
-          <Button 
-            onClick={handleDeleteConfirm} 
-            color="error" 
-            variant="contained"
-            sx={{ 
-              borderRadius: 20,
-              px: 3,
-              boxShadow: 'none'
-            }}
-          >
-            Eliminar
-          </Button>
-        </DialogActions>
-      </Dialog>
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        }
+      />
     </Box>
   );
 };
