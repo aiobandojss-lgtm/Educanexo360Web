@@ -1,258 +1,149 @@
 // src/components/calendario/EventoActionButtons.tsx
-import React, { useState } from 'react';
-import { 
-  Box, 
-  Button, 
-  IconButton, 
-  Tooltip, 
-  CircularProgress,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogContentText,
-  DialogActions,
-  Alert,
-  Chip
-} from '@mui/material';
+import React, { useState } from "react";
 import {
+  Box,
+  Button,
+  Tooltip,
+  IconButton,
+  CircularProgress,
+} from "@mui/material";
+import {
+  CheckCircleOutline as ApproveIcon,
+  Cancel as RejectIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
-  CheckCircle as CheckCircleIcon,
-  Cancel as CancelIcon,
-  Event as EventIcon,
-} from '@mui/icons-material';
-import calendarioService, { IEvento } from '../../services/calendarioService';
+} from "@mui/icons-material";
+import calendarioService, { IEvento } from "../../services/calendarioService";
 
 interface EventoActionButtonsProps {
   evento: IEvento;
+  showEditDelete?: boolean;
+  showApprove?: boolean;
   onEdit?: (id: string) => void;
   onDelete?: (id: string) => void;
   onStateChange?: () => void;
-  showEditDelete?: boolean;
-  showApprove?: boolean;
-  size?: 'small' | 'medium' | 'large';
 }
 
 const EventoActionButtons: React.FC<EventoActionButtonsProps> = ({
   evento,
+  showEditDelete = true,
+  showApprove = true,
   onEdit,
   onDelete,
   onStateChange,
-  showEditDelete = true,
-  showApprove = true,
-  size = 'small'
 }) => {
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [dialogOpen, setDialogOpen] = useState<boolean>(false);
-  const [actionType, setActionType] = useState<'approve' | 'cancel' | 'delete' | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  // Determinar si el evento es aprobable/cancelable
-  const canBeApproved = evento.estado === 'PENDIENTE';
-  const canBeCancelled = evento.estado === 'ACTIVO';
-
-  const handleOpenDialog = (type: 'approve' | 'cancel' | 'delete') => {
-    setActionType(type);
-    setDialogOpen(true);
-  };
-
-  const handleCloseDialog = () => {
-    setDialogOpen(false);
-    setActionType(null);
-  };
-
-  const handleAction = async () => {
-    if (!actionType) return;
-
-    setLoading(true);
-    setError(null);
-    setSuccess(null);
-
+  // Función para aprobar un evento
+  const handleApprove = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     try {
-      if (actionType === 'approve') {
-        await calendarioService.cambiarEstadoEvento(evento._id, 'ACTIVO');
-        setSuccess('Evento aprobado correctamente');
-      } else if (actionType === 'cancel') {
-        await calendarioService.cambiarEstadoEvento(evento._id, 'CANCELADO');
-        setSuccess('Evento cancelado correctamente');
-      } else if (actionType === 'delete' && onDelete) {
-        onDelete(evento._id);
-        setDialogOpen(false);
-        return; // No cerramos el diálogo aquí porque onDelete se encargará
-      }
-
-      // Notificar cambio de estado
-      if (onStateChange) {
-        onStateChange();
-      }
-
-      // Cerrar diálogo después de un breve momento
-      setTimeout(() => {
-        setDialogOpen(false);
-        setSuccess(null);
-      }, 1500);
-      
-    } catch (err: any) {
-      console.error(`Error al ${actionType === 'approve' ? 'aprobar' : actionType === 'cancel' ? 'cancelar' : 'eliminar'} evento:`, err);
-      setError(err.message || 'Ha ocurrido un error');
+      setLoading(true);
+      await calendarioService.aprobarEvento(evento._id);
+      if (onStateChange) onStateChange();
+    } catch (error) {
+      console.error("Error al aprobar evento:", error);
+      alert("Error al aprobar evento. Inténtalo de nuevo más tarde.");
     } finally {
       setLoading(false);
     }
   };
 
-  // Renderizar chip de estado
-  const renderEstadoChip = () => {
-    let color: 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning' = 'default';
-    let label = 'Desconocido';
-
-    switch (evento.estado) {
-      case 'PENDIENTE':
-        color = 'warning';
-        label = 'Pendiente';
-        break;
-      case 'ACTIVO':
-        color = 'success';
-        label = 'Activo';
-        break;
-      case 'FINALIZADO':
-        color = 'info';
-        label = 'Finalizado';
-        break;
-      case 'CANCELADO':
-        color = 'error';
-        label = 'Cancelado';
-        break;
-    }
-
-    return (
-      <Chip 
-        size="small"
-        color={color}
-        label={label}
-        icon={<EventIcon />}
-        sx={{ mr: 1 }}
-      />
+  // Función para rechazar un evento
+  const handleReject = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const userConfirmed = window.confirm(
+      "¿Estás seguro de que deseas rechazar este evento?"
     );
+    if (!userConfirmed) return;
+
+    try {
+      setLoading(true);
+      await calendarioService.rechazarEvento(evento._id);
+      if (onStateChange) onStateChange();
+    } catch (error) {
+      console.error("Error al rechazar evento:", error);
+      alert("Error al rechazar evento. Inténtalo de nuevo más tarde.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  return (
-    <>
-      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-        {renderEstadoChip()}
-        
-        {showEditDelete && (
-          <>
-            {onEdit && (
-              <Tooltip title="Editar evento">
-                <IconButton 
-                  size={size} 
-                  onClick={() => onEdit(evento._id)} 
-                  color="primary"
-                >
-                  <EditIcon fontSize={size} />
-                </IconButton>
-              </Tooltip>
-            )}
-            
-            {onDelete && (
-              <Tooltip title="Eliminar evento">
-                <IconButton 
-                  size={size} 
-                  onClick={() => handleOpenDialog('delete')} 
-                  color="error"
-                >
-                  <DeleteIcon fontSize={size} />
-                </IconButton>
-              </Tooltip>
-            )}
-          </>
-        )}
-        
-        {showApprove && (
-          <>
-            {canBeApproved && (
-              <Tooltip title="Aprobar evento">
-                <IconButton 
-                  size={size} 
-                  onClick={() => handleOpenDialog('approve')} 
-                  color="success"
-                >
-                  <CheckCircleIcon fontSize={size} />
-                </IconButton>
-              </Tooltip>
-            )}
-            
-            {canBeCancelled && (
-              <Tooltip title="Cancelar evento">
-                <IconButton 
-                  size={size} 
-                  onClick={() => handleOpenDialog('cancel')} 
-                  color="error"
-                >
-                  <CancelIcon fontSize={size} />
-                </IconButton>
-              </Tooltip>
-            )}
-          </>
-        )}
-      </Box>
+  // Función para editar evento
+  const handleEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onEdit) onEdit(evento._id);
+  };
 
-      {/* Diálogo de confirmación */}
-      <Dialog
-        open={dialogOpen}
-        onClose={handleCloseDialog}
-        aria-labelledby="alert-dialog-title"
-        aria-describedby="alert-dialog-description"
-      >
-        <DialogTitle id="alert-dialog-title">
-          {actionType === 'approve' ? '¿Aprobar evento?' :
-           actionType === 'cancel' ? '¿Cancelar evento?' :
-           '¿Eliminar evento?'}
-        </DialogTitle>
-        
-        <DialogContent>
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
+  // Función para eliminar evento
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onDelete) onDelete(evento._id);
+  };
+
+  // No mostrar botones de aprobación para eventos ya activos o cancelados
+  const showApproveButtons = showApprove && evento.estado === "PENDIENTE";
+
+  return (
+    <Box sx={{ display: "flex", gap: 1 }}>
+      {loading && <CircularProgress size={24} />}
+
+      {showApproveButtons && (
+        <>
+          <Tooltip title="Aprobar evento">
+            <IconButton
+              color="success"
+              onClick={handleApprove}
+              disabled={loading}
+              size="small"
+            >
+              <ApproveIcon />
+            </IconButton>
+          </Tooltip>
+
+          <Tooltip title="Rechazar evento">
+            <IconButton
+              color="error"
+              onClick={handleReject}
+              disabled={loading}
+              size="small"
+            >
+              <RejectIcon />
+            </IconButton>
+          </Tooltip>
+        </>
+      )}
+
+      {showEditDelete && (
+        <>
+          {onEdit && (
+            <Tooltip title="Editar evento">
+              <IconButton
+                color="primary"
+                onClick={handleEdit}
+                disabled={loading}
+                size="small"
+              >
+                <EditIcon />
+              </IconButton>
+            </Tooltip>
           )}
-          
-          {success && (
-            <Alert severity="success" sx={{ mb: 2 }}>
-              {success}
-            </Alert>
+
+          {onDelete && (
+            <Tooltip title="Eliminar evento">
+              <IconButton
+                color="error"
+                onClick={handleDelete}
+                disabled={loading}
+                size="small"
+              >
+                <DeleteIcon />
+              </IconButton>
+            </Tooltip>
           )}
-          
-          <DialogContentText id="alert-dialog-description">
-            {actionType === 'approve' ? 
-              'Al aprobar este evento, será visible para todos los usuarios en el calendario. ¿Desea continuar?' :
-             actionType === 'cancel' ? 
-              'Al cancelar este evento, dejará de ser visible en el calendario. ¿Desea continuar?' :
-              'Esta acción no se puede deshacer. ¿Está seguro de que desea eliminar permanentemente este evento?'}
-          </DialogContentText>
-        </DialogContent>
-        
-        <DialogActions>
-          <Button onClick={handleCloseDialog} disabled={loading}>
-            Cerrar
-          </Button>
-          <Button 
-            onClick={handleAction} 
-            color={actionType === 'approve' ? 'success' : 'error'}
-            variant="contained"
-            disabled={loading}
-            startIcon={loading ? <CircularProgress size={20} /> : null}
-            autoFocus
-          >
-            {loading ? 'Procesando...' : 
-             actionType === 'approve' ? 'Aprobar' : 
-             actionType === 'cancel' ? 'Cancelar' : 
-             'Eliminar'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </>
+        </>
+      )}
+    </Box>
   );
 };
 

@@ -1,7 +1,7 @@
 // src/components/layout/NavigationMenu.tsx
-import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import React, { useState, useEffect, useMemo } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useSelector } from "react-redux";
 import {
   Box,
   List,
@@ -13,28 +13,30 @@ import {
   Collapse,
   Typography,
   IconButton,
-} from '@mui/material';
+} from "@mui/material";
 import {
-  Dashboard as DashboardIcon,
-  Message as MessageIcon,
-  School as SchoolIcon,
-  Group as UsersIcon,
-  Settings as SettingsIcon,
-  Person as PersonIcon,
-  MenuBook as CursosIcon,
-  ExpandLess,
-  ExpandMore,
-  CalendarMonth as CalendarIcon,
-  HowToReg as AsistenciaIcon,
-  Delete as DeleteIcon, // Ícono para mensajes eliminados
-  Send as SendIcon, // Ícono para mensajes enviados
-  Inbox as InboxIcon, // Ícono para mensajes recibidos
-  Create as CreateIcon, // Ícono para nuevo mensaje
-  Edit as EditIcon, // Ícono para mensajes borradores
-  Announcement as AnnouncementIcon,
-} from '@mui/icons-material';
-import { RootState } from '../../redux/store';
-import { Archive as ArchiveIcon } from '@mui/icons-material';
+  LayoutDashboard,
+  MessageCircle,
+  Users,
+  BookOpen,
+  Settings,
+  User,
+  ChevronUp,
+  ChevronDown,
+  Calendar,
+  ClipboardCheck,
+  Trash,
+  Send,
+  Inbox,
+  PenSquare,
+  Edit,
+  Megaphone,
+  Archive,
+  Mail,
+  UserPlus,
+  CheckSquare,
+} from "lucide-react";
+import { RootState } from "../../redux/store";
 
 interface NavigationItem {
   title: string;
@@ -57,131 +59,279 @@ const NavigationMenu: React.FC = () => {
   const handleToggle = (title: string, event: React.MouseEvent) => {
     // Detener la propagación para evitar que el evento llegue al ListItemButton
     event.stopPropagation();
-    
+
     setOpen((prevOpen) => ({
       ...prevOpen,
       [title]: !prevOpen[title],
     }));
   };
 
+  // Estilo común para los iconos de Lucide
+  const iconProps = { size: 22, strokeWidth: 1.5 };
+
   // Configuración del menú
   const menuItems: NavigationItem[] = [
     {
-      title: 'Dashboard',
-      icon: <DashboardIcon />,
-      path: '/',
-      allowedRoles: ['ADMIN', 'DOCENTE', 'ESTUDIANTE', 'PADRE', 'ACUDIENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO'],
+      title: "Dashboard",
+      icon: <LayoutDashboard {...iconProps} />,
+      path: "/",
+      allowedRoles: [
+        "ADMIN",
+        "DOCENTE",
+        "ESTUDIANTE",
+        "PADRE",
+        "ACUDIENTE",
+        "COORDINADOR",
+        "RECTOR",
+        "ADMINISTRATIVO",
+      ],
     },
     {
-      title: 'Mensajería',
-      icon: <MessageIcon />,
-      path: '/mensajes',
-      allowedRoles: ['ADMIN', 'DOCENTE', 'ESTUDIANTE', 'PADRE', 'ACUDIENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO'],
+      title: "Mensajería",
+      icon: <MessageCircle {...iconProps} />,
+      path: "/mensajes",
+      allowedRoles: [
+        "ADMIN",
+        "DOCENTE",
+        "ESTUDIANTE",
+        "PADRE",
+        "ACUDIENTE",
+        "COORDINADOR",
+        "RECTOR",
+        "ADMINISTRATIVO",
+      ],
       children: [
         {
-          title: 'Recibidos',
-          icon: <InboxIcon />,
-          path: '/mensajes/recibidos',
-          allowedRoles: ['ADMIN', 'DOCENTE', 'ESTUDIANTE', 'PADRE', 'ACUDIENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO'],
+          title: "Recibidos",
+          icon: <Inbox {...iconProps} />,
+          path: "/mensajes/recibidos",
+          allowedRoles: [
+            "ADMIN",
+            "DOCENTE",
+            "ESTUDIANTE",
+            "PADRE",
+            "ACUDIENTE",
+            "COORDINADOR",
+            "RECTOR",
+            "ADMINISTRATIVO",
+          ],
         },
         {
-          title: 'Enviados',
-          icon: <SendIcon />,
-          path: '/mensajes/enviados',
+          title: "Enviados",
+          icon: <Send {...iconProps} />,
+          path: "/mensajes/enviados",
           // Excluimos ESTUDIANTE de los roles que pueden ver "Enviados"
-          allowedRoles: ['ADMIN', 'DOCENTE', 'PADRE', 'ACUDIENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO'],
+          allowedRoles: [
+            "ADMIN",
+            "DOCENTE",
+            "PADRE",
+            "ACUDIENTE",
+            "COORDINADOR",
+            "RECTOR",
+            "ADMINISTRATIVO",
+          ],
         },
         {
-          title: 'Borradores',
-          icon: <EditIcon />,
-          path: '/mensajes/borradores',
+          title: "Borradores",
+          icon: <Edit {...iconProps} />,
+          path: "/mensajes/borradores",
           // Solo los roles con permiso para usar borradores
-          allowedRoles: ['ADMIN', 'DOCENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO'],
+          allowedRoles: [
+            "ADMIN",
+            "DOCENTE",
+            "COORDINADOR",
+            "RECTOR",
+            "ADMINISTRATIVO",
+          ],
         },
         {
-          title: 'Archivados',
-          icon: <ArchiveIcon />, // Asegúrate de importar ArchiveIcon
-          path: '/mensajes/archivados',
+          title: "Archivados",
+          icon: <Archive {...iconProps} />,
+          path: "/mensajes/archivados",
           // Incluimos ESTUDIANTE en los roles que pueden ver "Archivados"
-          allowedRoles: ['ADMIN', 'DOCENTE', 'ESTUDIANTE', 'PADRE', 'ACUDIENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO'],
+          allowedRoles: [
+            "ADMIN",
+            "DOCENTE",
+            "ESTUDIANTE",
+            "PADRE",
+            "ACUDIENTE",
+            "COORDINADOR",
+            "RECTOR",
+            "ADMINISTRATIVO",
+          ],
         },
         {
-          title: 'Nuevo Mensaje',
-          icon: <CreateIcon />,
-          path: '/mensajes/nuevo',
+          title: "Nuevo Mensaje",
+          icon: <PenSquare {...iconProps} />,
+          path: "/mensajes/nuevo",
           // Excluimos ESTUDIANTE de los roles que pueden crear "Nuevo Mensaje"
-          allowedRoles: ['ADMIN', 'DOCENTE', 'PADRE', 'ACUDIENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO'],
+          allowedRoles: [
+            "ADMIN",
+            "DOCENTE",
+            "PADRE",
+            "ACUDIENTE",
+            "COORDINADOR",
+            "RECTOR",
+            "ADMINISTRATIVO",
+          ],
         },
         {
-          title: 'Eliminados',
-          icon: <DeleteIcon />,
-          path: '/mensajes/eliminados',
-          allowedRoles: ['ADMIN', 'DOCENTE', 'ESTUDIANTE', 'PADRE', 'ACUDIENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO'],
+          title: "Eliminados",
+          icon: <Trash {...iconProps} />,
+          path: "/mensajes/eliminados",
+          allowedRoles: [
+            "ADMIN",
+            "DOCENTE",
+            "ESTUDIANTE",
+            "PADRE",
+            "ACUDIENTE",
+            "COORDINADOR",
+            "RECTOR",
+            "ADMINISTRATIVO",
+          ],
         },
       ],
     },
     {
-      title: 'Usuarios',
-      icon: <UsersIcon />,
-      path: '/usuarios',
+      title: "Usuarios",
+      icon: <Users {...iconProps} />,
+      path: "/usuarios",
       // Eliminamos 'ADMINISTRATIVO' de los roles permitidos para ver Usuarios
-      allowedRoles: ['ADMIN', 'COORDINADOR', 'RECTOR'],
+      allowedRoles: ["ADMIN", "COORDINADOR", "RECTOR"],
     },
     {
-      title: 'Cursos',
-      icon: <CursosIcon />,
-      path: '/cursos',
-      allowedRoles: ['ADMIN', 'DOCENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO'],
+      title: "Cursos",
+      icon: <BookOpen {...iconProps} />,
+      path: "/cursos",
+      allowedRoles: [
+        "ADMIN",
+        "DOCENTE",
+        "COORDINADOR",
+        "RECTOR",
+        "ADMINISTRATIVO",
+      ],
     },
-    // Nuevo ítem de menú para Asistencia
+    // Nuevo ítem de menú para Gestión de Registro
     {
-      title: 'Asistencia',
-      icon: <AsistenciaIcon />,
-      path: '/asistencia',
-      allowedRoles: ['ADMIN', 'DOCENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO'],
+      title: "Gestión de Registro",
+      icon: <UserPlus {...iconProps} />,
+      path: "/admin/solicitudes",
+      allowedRoles: ["ADMIN", "COORDINADOR", "RECTOR", "ADMINISTRATIVO"],
       children: [
         {
-          title: 'Lista de Registros',
-          icon: <AsistenciaIcon />,
-          path: '/asistencia',
-          allowedRoles: ['ADMIN', 'DOCENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO'],
+          title: "Invitaciones",
+          icon: <Mail {...iconProps} />,
+          path: "/admin/invitaciones",
+          allowedRoles: ["ADMIN", "COORDINADOR", "RECTOR", "ADMINISTRATIVO"],
         },
         {
-          title: 'Nuevo Registro',
-          icon: <AsistenciaIcon />,
-          path: '/asistencia/registro',
-          allowedRoles: ['ADMIN', 'DOCENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO'],
+          title: "Solicitudes Pendientes",
+          icon: <CheckSquare {...iconProps} />,
+          path: "/admin/solicitudes",
+          allowedRoles: ["ADMIN", "COORDINADOR", "RECTOR", "ADMINISTRATIVO"],
+        },
+        {
+          title: "Nueva Invitación",
+          icon: <PenSquare {...iconProps} />,
+          path: "/admin/invitaciones/crear",
+          allowedRoles: ["ADMIN", "COORDINADOR", "RECTOR"],
+        },
+      ],
+    },
+    // Ítem de menú para Asistencia
+    {
+      title: "Asistencia",
+      icon: <ClipboardCheck {...iconProps} />,
+      path: "/asistencia",
+      allowedRoles: [
+        "ADMIN",
+        "DOCENTE",
+        "COORDINADOR",
+        "RECTOR",
+        "ADMINISTRATIVO",
+      ],
+      children: [
+        {
+          title: "Lista de Registros",
+          icon: <ClipboardCheck {...iconProps} />,
+          path: "/asistencia",
+          allowedRoles: [
+            "ADMIN",
+            "DOCENTE",
+            "COORDINADOR",
+            "RECTOR",
+            "ADMINISTRATIVO",
+          ],
+        },
+        {
+          title: "Nuevo Registro",
+          icon: <PenSquare {...iconProps} />,
+          path: "/asistencia/registro",
+          allowedRoles: [
+            "ADMIN",
+            "DOCENTE",
+            "COORDINADOR",
+            "RECTOR",
+            "ADMINISTRATIVO",
+          ],
         },
       ],
     },
     {
-      title: 'Calendario Escolar',
-      icon: <CalendarIcon />,
-      path: '/calendario',
-      allowedRoles: ['ADMIN', 'DOCENTE', 'ESTUDIANTE', 'PADRE', 'ACUDIENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO'],
+      title: "Calendario Escolar",
+      icon: <Calendar {...iconProps} />,
+      path: "/calendario",
+      allowedRoles: [
+        "ADMIN",
+        "DOCENTE",
+        "ESTUDIANTE",
+        "PADRE",
+        "ACUDIENTE",
+        "COORDINADOR",
+        "RECTOR",
+        "ADMINISTRATIVO",
+      ],
     },
     {
-      title: 'Tablero de Anuncios',
-      icon: <AnnouncementIcon />,
-      path: '/anuncios',
-      allowedRoles: ['ADMIN', 'DOCENTE', 'ESTUDIANTE', 'PADRE', 'ACUDIENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO'],
+      title: "Tablero de Anuncios",
+      icon: <Megaphone {...iconProps} />,
+      path: "/anuncios",
+      allowedRoles: [
+        "ADMIN",
+        "DOCENTE",
+        "ESTUDIANTE",
+        "PADRE",
+        "ACUDIENTE",
+        "COORDINADOR",
+        "RECTOR",
+        "ADMINISTRATIVO",
+      ],
     },
     {
-      title: 'Perfil',
-      icon: <PersonIcon />,
-      path: '/perfil',
-      allowedRoles: ['ADMIN', 'DOCENTE', 'ESTUDIANTE', 'PADRE', 'ACUDIENTE', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO'],
+      title: "Perfil",
+      icon: <User {...iconProps} />,
+      path: "/perfil",
+      allowedRoles: [
+        "ADMIN",
+        "DOCENTE",
+        "ESTUDIANTE",
+        "PADRE",
+        "ACUDIENTE",
+        "COORDINADOR",
+        "RECTOR",
+        "ADMINISTRATIVO",
+      ],
     },
     //{
-     // title: 'Configuración',
-     // icon: <SettingsIcon />,
-     // path: '/configuracion',
-      //allowedRoles: ['ADMIN', 'COORDINADOR', 'RECTOR'],
+    // title: 'Configuración',
+    // icon: <Settings {...iconProps} />,
+    // path: '/configuracion',
+    //allowedRoles: ['ADMIN', 'COORDINADOR', 'RECTOR'],
     //},
   ];
 
   // Filtrar menú por rol de usuario - usando useMemo para evitar recalcular en cada render
-  const userRole = user?.tipo || '';
+  const userRole = user?.tipo || "";
   const filteredMenu = useMemo(() => {
     return menuItems.filter((item) => item.allowedRoles.includes(userRole));
   }, [userRole]);
@@ -189,22 +339,24 @@ const NavigationMenu: React.FC = () => {
   // Actualizamos el estado de expansión cuando cambia la ruta
   useEffect(() => {
     // Solo necesitamos ejecutar esto cuando cambia la ruta o el menú filtrado
-    const newOpenState: { [key: string]: boolean } = {...open};
+    const newOpenState: { [key: string]: boolean } = { ...open };
     let didChange = false;
-    
-    filteredMenu.forEach(item => {
+
+    filteredMenu.forEach((item) => {
       if (item.children) {
-        const shouldBeOpen = item.children.some(child => 
-          location.pathname === child.path || location.pathname.startsWith(child.path)
+        const shouldBeOpen = item.children.some(
+          (child) =>
+            location.pathname === child.path ||
+            location.pathname.startsWith(child.path)
         );
-        
+
         if (shouldBeOpen && !newOpenState[item.title]) {
           newOpenState[item.title] = true;
           didChange = true;
         }
       }
     });
-    
+
     // Solo actualizar el estado si hubo un cambio real
     if (didChange) {
       setOpen(newOpenState);
@@ -213,12 +365,13 @@ const NavigationMenu: React.FC = () => {
   }, [location.pathname, filteredMenu]); // Eliminamos 'open' de las dependencias
 
   return (
-    <Box sx={{ width: '100%', bgcolor: 'background.paper' }}>
+    <Box sx={{ width: "100%", bgcolor: "background.paper" }}>
       <List component="nav" sx={{ p: 1 }}>
         {filteredMenu.map((item) => {
-          const isActive = location.pathname === item.path || 
-                          (item.children && location.pathname.startsWith(item.path));
-          
+          const isActive =
+            location.pathname === item.path ||
+            (item.children && location.pathname.startsWith(item.path));
+
           if (item.children) {
             return (
               <React.Fragment key={item.title}>
@@ -228,22 +381,28 @@ const NavigationMenu: React.FC = () => {
                     sx={{
                       borderRadius: 2,
                       mb: 0.5,
-                      bgcolor: isActive ? 'rgba(93, 169, 233, 0.1)' : 'transparent',
-                      '&:hover': {
-                        bgcolor: isActive ? 'rgba(93, 169, 233, 0.2)' : 'rgba(0, 0, 0, 0.04)',
+                      bgcolor: isActive
+                        ? "rgba(93, 169, 233, 0.1)"
+                        : "transparent",
+                      "&:hover": {
+                        bgcolor: isActive
+                          ? "rgba(93, 169, 233, 0.2)"
+                          : "rgba(0, 0, 0, 0.04)",
                       },
                     }}
                   >
-                    <ListItemIcon sx={{ color: isActive ? 'primary.main' : 'inherit' }}>
+                    <ListItemIcon
+                      sx={{ color: isActive ? "primary.main" : "inherit" }}
+                    >
                       {item.icon}
                     </ListItemIcon>
                     <ListItemText
                       primary={
-                        <Typography 
-                          variant="body1" 
-                          sx={{ 
-                            fontWeight: isActive ? 600 : 400, 
-                            color: isActive ? 'primary.main' : 'inherit' 
+                        <Typography
+                          variant="body1"
+                          sx={{
+                            fontWeight: isActive ? 600 : 400,
+                            color: isActive ? "primary.main" : "inherit",
                           }}
                         >
                           {item.title}
@@ -255,17 +414,22 @@ const NavigationMenu: React.FC = () => {
                       onClick={(e) => handleToggle(item.title, e)}
                       sx={{ ml: 1 }}
                     >
-                      {open[item.title] ? <ExpandLess /> : <ExpandMore />}
+                      {open[item.title] ? (
+                        <ChevronUp size={18} />
+                      ) : (
+                        <ChevronDown size={18} />
+                      )}
                     </IconButton>
                   </ListItemButton>
                 </ListItem>
                 <Collapse in={open[item.title]} timeout="auto" unmountOnExit>
                   <List component="div" disablePadding>
                     {item.children
-                      .filter(child => child.allowedRoles.includes(userRole))
+                      .filter((child) => child.allowedRoles.includes(userRole))
                       .map((child) => {
-                        const isChildActive = location.pathname === child.path ||
-                                            location.pathname.startsWith(child.path);
+                        const isChildActive =
+                          location.pathname === child.path ||
+                          location.pathname.startsWith(child.path);
                         return (
                           <ListItem key={child.title} disablePadding>
                             <ListItemButton
@@ -274,22 +438,34 @@ const NavigationMenu: React.FC = () => {
                                 pl: 4,
                                 borderRadius: 2,
                                 mb: 0.5,
-                                bgcolor: isChildActive ? 'rgba(93, 169, 233, 0.1)' : 'transparent',
-                                '&:hover': {
-                                  bgcolor: isChildActive ? 'rgba(93, 169, 233, 0.2)' : 'rgba(0, 0, 0, 0.04)',
+                                bgcolor: isChildActive
+                                  ? "rgba(93, 169, 233, 0.1)"
+                                  : "transparent",
+                                "&:hover": {
+                                  bgcolor: isChildActive
+                                    ? "rgba(93, 169, 233, 0.2)"
+                                    : "rgba(0, 0, 0, 0.04)",
                                 },
                               }}
                             >
-                              <ListItemIcon sx={{ color: isChildActive ? 'primary.main' : 'inherit' }}>
+                              <ListItemIcon
+                                sx={{
+                                  color: isChildActive
+                                    ? "primary.main"
+                                    : "inherit",
+                                }}
+                              >
                                 {child.icon}
                               </ListItemIcon>
-                              <ListItemText 
+                              <ListItemText
                                 primary={
-                                  <Typography 
-                                    variant="body1" 
-                                    sx={{ 
-                                      fontWeight: isChildActive ? 600 : 400, 
-                                      color: isChildActive ? 'primary.main' : 'inherit' 
+                                  <Typography
+                                    variant="body1"
+                                    sx={{
+                                      fontWeight: isChildActive ? 600 : 400,
+                                      color: isChildActive
+                                        ? "primary.main"
+                                        : "inherit",
                                     }}
                                   >
                                     {child.title}
@@ -305,7 +481,7 @@ const NavigationMenu: React.FC = () => {
               </React.Fragment>
             );
           }
-          
+
           return (
             <ListItem key={item.title} disablePadding>
               <ListItemButton
@@ -313,22 +489,26 @@ const NavigationMenu: React.FC = () => {
                 sx={{
                   borderRadius: 2,
                   mb: 0.5,
-                  bgcolor: isActive ? 'rgba(93, 169, 233, 0.1)' : 'transparent',
-                  '&:hover': {
-                    bgcolor: isActive ? 'rgba(93, 169, 233, 0.2)' : 'rgba(0, 0, 0, 0.04)',
+                  bgcolor: isActive ? "rgba(93, 169, 233, 0.1)" : "transparent",
+                  "&:hover": {
+                    bgcolor: isActive
+                      ? "rgba(93, 169, 233, 0.2)"
+                      : "rgba(0, 0, 0, 0.04)",
                   },
                 }}
               >
-                <ListItemIcon sx={{ color: isActive ? 'primary.main' : 'inherit' }}>
+                <ListItemIcon
+                  sx={{ color: isActive ? "primary.main" : "inherit" }}
+                >
                   {item.icon}
                 </ListItemIcon>
-                <ListItemText 
+                <ListItemText
                   primary={
-                    <Typography 
-                      variant="body1" 
-                      sx={{ 
-                        fontWeight: isActive ? 600 : 400, 
-                        color: isActive ? 'primary.main' : 'inherit' 
+                    <Typography
+                      variant="body1"
+                      sx={{
+                        fontWeight: isActive ? 600 : 400,
+                        color: isActive ? "primary.main" : "inherit",
                       }}
                     >
                       {item.title}
@@ -341,7 +521,14 @@ const NavigationMenu: React.FC = () => {
         })}
       </List>
       <Divider />
-      <Box sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <Box
+        sx={{
+          p: 2,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
         <Typography variant="caption" color="text.secondary" align="center">
           EducaNexo360 © {new Date().getFullYear()}
         </Typography>

@@ -1,55 +1,70 @@
-// src/types/anuncio.types.ts
-export interface IAnuncio {
-    _id: string;
-    titulo: string;
-    contenido: string;
-    autor: {
-      _id: string;
-      nombre: string;
-      apellidos: string;
-      tipo: string;
-    };
-    escuelaId: string;
-    fechaPublicacion: Date | string;
-    fechaExpiracion?: Date | string;
-    importante: boolean;
-    destinatarios: string[]; // 'TODOS', 'DOCENTES', 'ESTUDIANTES', 'PADRES', 'ADMIN'
-    adjuntos?: {
-      nombre: string;
-      url: string;
-      tipo: string;
-      tamanio: number;
-    }[];
-    estado: 'ACTIVO' | 'INACTIVO';
-    createdAt: Date | string;
-    updatedAt: Date | string;
-  }
-  
-  export interface IAnuncioListItem {
-    _id: string;
-    titulo: string;
-    autor: {
-      nombre: string;
-      apellidos: string;
-    };
-    fechaPublicacion: Date | string;
-    importante: boolean;
-    estado: 'ACTIVO' | 'INACTIVO';
-  }
-  
-  export interface IAnuncioNuevo {
-    titulo: string;
-    contenido: string;
-    importante: boolean;
-    destinatarios: string[];
-    fechaExpiracion?: Date | string;
-    escuelaId: string;
-  }
-  
-  export interface IAnuncioFiltros {
-    importante?: boolean;
-    estado?: 'ACTIVO' | 'INACTIVO';
-    fechaDesde?: Date | string;
-    fechaHasta?: Date | string;
-    destinatarios?: string[];
-  }
+export interface Usuario {
+  _id: string;
+  nombre: string;
+  apellidos: string;
+}
+
+export interface ArchivoAdjunto {
+  fileId: string;
+  nombre: string;
+  tipo: string;
+  tamaño: number;
+}
+
+export interface ImagenPortada {
+  fileId: string;
+  url: string;
+}
+
+export interface Lectura {
+  usuarioId: string;
+  fechaLectura: string;
+}
+
+export interface Anuncio {
+  _id: string;
+  titulo: string;
+  contenido: string;
+  creador: string | Usuario;
+  escuelaId: string;
+  fechaPublicacion: string;
+  estaPublicado: boolean;
+  paraEstudiantes: boolean;
+  paraDocentes: boolean;
+  paraPadres: boolean;
+  destacado: boolean;
+  archivosAdjuntos: ArchivoAdjunto[];
+  imagenPortada?: ImagenPortada;
+  lecturas: Lectura[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AnuncioInput {
+  titulo: string;
+  contenido: string;
+  paraEstudiantes?: boolean;
+  paraDocentes?: boolean;
+  paraPadres?: boolean;
+  destacado?: boolean;
+  estaPublicado?: boolean;
+}
+
+export interface AnuncioFilters {
+  pagina?: number;
+  limite?: number;
+  soloDestacados?: boolean;
+  soloPublicados?: boolean;
+  paraRol?: "ESTUDIANTE" | "DOCENTE" | "ACUDIENTE";
+  busqueda?: string;
+}
+
+export interface AnunciosPaginados {
+  data: Anuncio[];
+  meta: {
+    total: number;
+    pagina: number;
+    limite: number;
+    paginas: number;
+  };
+}

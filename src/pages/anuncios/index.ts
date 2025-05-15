@@ -1,4 +1,12 @@
 // src/pages/anuncios/index.ts
-export { default as ListaAnuncios } from './ListaAnuncios';
-export { default as DetalleAnuncio } from './DetalleAnuncio';
-export { default as FormularioAnuncio } from './FormularioAnuncio';
+import ListaAnuncios from "./ListaAnuncios";
+import DetalleAnuncio from "./DetalleAnuncio";
+import FormularioAnuncio from "./FormularioAnuncio";
+
+export { ListaAnuncios, DetalleAnuncio, FormularioAnuncio };
+
+export default {
+  ListaAnuncios,
+  DetalleAnuncio,
+  FormularioAnuncio,
+};
