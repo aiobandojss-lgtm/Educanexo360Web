@@ -1,9 +1,9 @@
 // src/services/authService.ts
-import axiosInstance from '../api/axiosConfig';
+import axiosInstance from "../api/axiosConfig";
 import { jwtDecode } from "jwt-decode";
-import API_ROUTES from '../constants/apiRoutes';
-import { User, UserRegister, AuthResponse } from '../types/user.types';
-import { ROLE_HIERARCHY, USER_ROLES } from '../types/user.types';
+import API_ROUTES from "../constants/apiRoutes";
+import { User, UserRegister, AuthResponse } from "../types/user.types";
+import { ROLE_HIERARCHY, USER_ROLES } from "../types/user.types";
 
 // Interfaz para tokens
 export interface Tokens {
@@ -19,31 +19,31 @@ export interface Tokens {
 
 // Guardar tokens en localStorage con mejor seguridad
 const saveTokens = (tokens: Tokens) => {
-  localStorage.setItem('accessToken', tokens.access.token);
-  localStorage.setItem('refreshToken', tokens.refresh.token);
+  localStorage.setItem("accessToken", tokens.access.token);
+  localStorage.setItem("refreshToken", tokens.refresh.token);
   // Guardar tiempo de expiración para validaciones del lado del cliente
-  localStorage.setItem('tokenExpires', tokens.access.expires);
+  localStorage.setItem("tokenExpires", tokens.access.expires);
 };
 
 // Obtener token de acceso
 export const getToken = (): string | null => {
-  return localStorage.getItem('accessToken');
+  return localStorage.getItem("accessToken");
 };
 
 // Obtener token de refresco
 export const getRefreshToken = (): string | null => {
-  return localStorage.getItem('refreshToken');
+  return localStorage.getItem("refreshToken");
 };
 
 // Obtener usuario actual del token
 export const getCurrentUser = (): User | null => {
   const token = getToken();
   if (!token) return null;
-  
+
   try {
     return jwtDecode<User>(token);
   } catch (error) {
-    console.error('Error decodificando token:', error);
+    console.error("Error decodificando token:", error);
     return null;
   }
 };
@@ -54,33 +54,44 @@ export const fetchUserProfile = async (): Promise<User> => {
     const response = await axiosInstance.get(API_ROUTES.USUARIOS.GET_PROFILE);
     return response.data.data;
   } catch (error) {
-    console.error('Error obteniendo perfil de usuario:', error);
+    console.error("Error obteniendo perfil de usuario:", error);
     throw error;
   }
 };
 
 // Login
-export const login = async (email: string, password: string): Promise<{ user: User, tokens: Tokens }> => {
+export const login = async (
+  email: string,
+  password: string
+): Promise<{ user: User; tokens: Tokens }> => {
   try {
-    const response = await axiosInstance.post(API_ROUTES.AUTH.LOGIN, { email, password });
+    const response = await axiosInstance.post(API_ROUTES.AUTH.LOGIN, {
+      email,
+      password,
+    });
     const { user, tokens } = response.data.data;
     saveTokens(tokens);
     return { user, tokens };
   } catch (error) {
-    console.error('Error en login:', error);
+    console.error("Error en login:", error);
     throw error;
   }
 };
 
 // Registro
-export const register = async (userData: UserRegister): Promise<{ user: User, tokens: Tokens }> => {
+export const register = async (
+  userData: UserRegister
+): Promise<{ user: User; tokens: Tokens }> => {
   try {
-    const response = await axiosInstance.post<{data: AuthResponse}>(API_ROUTES.AUTH.REGISTER, userData);
+    const response = await axiosInstance.post<{ data: AuthResponse }>(
+      API_ROUTES.AUTH.REGISTER,
+      userData
+    );
     const { user, tokens } = response.data.data;
     saveTokens(tokens);
     return { user, tokens };
   } catch (error) {
-    console.error('Error en registro:', error);
+    console.error("Error en registro:", error);
     throw error;
   }
 };
@@ -92,38 +103,41 @@ export const logout = (): void => {
     const token = getToken();
     if (token) {
       // Solicitud asíncrona sin awaitar para no bloquear la UI
-      axiosInstance.post(API_ROUTES.AUTH.LOGOUT)
-        .catch(error => console.error('Error en logout del servidor:', error));
+      axiosInstance
+        .post(API_ROUTES.AUTH.LOGOUT)
+        .catch((error) =>
+          console.error("Error en logout del servidor:", error)
+        );
     }
   } catch (e) {
-    console.error('Error intentando logout:', e);
+    console.error("Error intentando logout:", e);
   }
-  
+
   // Limpiar localStorage
-  localStorage.removeItem('accessToken');
-  localStorage.removeItem('refreshToken');
-  localStorage.removeItem('tokenExpires');
-  localStorage.removeItem('userProfile');
+  localStorage.removeItem("accessToken");
+  localStorage.removeItem("refreshToken");
+  localStorage.removeItem("tokenExpires");
+  localStorage.removeItem("userProfile");
 };
 
 // Refrescar token
 export const refreshToken = async (): Promise<string | null> => {
   const refreshTokenValue = getRefreshToken();
-  
+
   if (!refreshTokenValue) {
     return null;
   }
-  
+
   try {
     const response = await axiosInstance.post(API_ROUTES.AUTH.REFRESH_TOKEN, {
       refreshToken: refreshTokenValue,
     });
-    
+
     const tokens = response.data.data;
     saveTokens(tokens);
     return tokens.access.token;
   } catch (error) {
-    console.error('Error refrescando token:', error);
+    console.error("Error refrescando token:", error);
     logout();
     return null;
   }
@@ -133,15 +147,24 @@ export const refreshToken = async (): Promise<string | null> => {
 export const isAuthenticated = (): boolean => {
   const token = getToken();
   if (!token) return false;
-  
+
   try {
     const decoded: any = jwtDecode(token);
     const currentTime = Date.now() / 1000;
-    
+
     // Verificar si el token no ha expirado
-    return decoded.exp > currentTime;
+    if (decoded.exp <= currentTime) {
+      // Token expirado, limpiar localStorage
+      console.log("Token expirado, limpiando localStorage");
+      logout();
+      return false;
+    }
+
+    return true;
   } catch (error) {
-    console.error('Error verificando autenticación:', error);
+    console.error("Error verificando autenticación:", error);
+    // Error al decodificar, limpiar localStorage
+    logout();
     return false;
   }
 };
@@ -158,7 +181,7 @@ export const changePassword = async (
     });
     return true;
   } catch (error) {
-    console.error('Error cambiando contraseña:', error);
+    console.error("Error cambiando contraseña:", error);
     throw error;
   }
 };
@@ -169,7 +192,7 @@ export const requestPasswordReset = async (email: string): Promise<boolean> => {
     await axiosInstance.post(API_ROUTES.AUTH.FORGOT_PASSWORD, { email });
     return true;
   } catch (error) {
-    console.error('Error solicitando reset de contraseña:', error);
+    console.error("Error solicitando reset de contraseña:", error);
     throw error;
   }
 };
@@ -186,15 +209,47 @@ export const resetPassword = async (
     });
     return true;
   } catch (error) {
-    console.error('Error reseteando contraseña:', error);
+    console.error("Error reseteando contraseña:", error);
     throw error;
   }
 };
 
 // Verificar permisos basados en rol
-export const hasPermission = (requiredRoles: string[], userRole?: string): boolean => {
+export const hasPermission = (
+  requiredRoles: string[],
+  userRole?: string
+): boolean => {
   if (!userRole) return false;
   return requiredRoles.includes(userRole);
+};
+
+// Verificar token con el backend
+export const verifyTokenWithServer = async (): Promise<User | null> => {
+  try {
+    // Si no hay token, no intentar verificar
+    if (!getToken()) {
+      console.log("No hay token almacenado, no se puede verificar");
+      return null;
+    }
+
+    console.log("Verificando token con el servidor...");
+
+    // Realizar una petición al endpoint de verificación
+    const response = await axiosInstance.get(API_ROUTES.AUTH.VERIFY_TOKEN);
+
+    console.log("Token verificado exitosamente con el servidor");
+
+    return response.data.data.user;
+  } catch (error) {
+    console.error("Error verificando token con el servidor:", error);
+
+    // Si hay cualquier error (token inválido, servidor no disponible, etc.),
+    // hacer logout para limpiar
+    console.log("Forzando logout debido a error de verificación");
+    logout();
+
+    return null;
+  }
 };
 
 export default {
@@ -210,5 +265,6 @@ export default {
   changePassword,
   requestPasswordReset,
   resetPassword,
-  hasPermission
+  hasPermission,
+  verifyTokenWithServer,
 };

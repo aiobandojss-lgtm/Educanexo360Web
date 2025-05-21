@@ -204,19 +204,28 @@ axiosInstance.interceptors.response.use(
     if (
       error.response?.status === 401 &&
       !originalRequest._retry &&
-      originalRequest.url !== "/api/auth/refresh-token"
+      originalRequest.url !== "/api/auth/refresh-token" &&
+      originalRequest.url !== "/api/auth/verify-token" // No intentar refresh token si es la verificación de token
     ) {
       originalRequest._retry = true;
+      console.log(
+        "Intentando renovar token para solicitud:",
+        originalRequest.url
+      );
 
       try {
         // Intentar renovar el token
         const newToken = await refreshToken();
 
         if (newToken) {
+          console.log(
+            "Token renovado exitosamente, reintentando solicitud original"
+          );
           // Actualizar el token en la solicitud original y reintentarla
           originalRequest.headers.Authorization = `Bearer ${newToken}`;
           return axiosInstance(originalRequest);
         } else {
+          console.log("No se pudo renovar el token, forzando logout");
           // Si no se pudo renovar el token, cerrar sesión
           logout();
           // En lugar de redirigir con window.location, retornamos un objeto con info para que el componente decida
@@ -228,6 +237,7 @@ axiosInstance.interceptors.response.use(
           });
         }
       } catch (refreshError) {
+        console.error("Error al renovar token:", refreshError);
         // Si hay un error al renovar el token, cerrar sesión
         logout();
         return Promise.reject({
@@ -253,7 +263,8 @@ axiosFileInstance.interceptors.response.use(
     if (
       error.response?.status === 401 &&
       !originalRequest._retry &&
-      originalRequest.url !== "/api/auth/refresh-token"
+      originalRequest.url !== "/api/auth/refresh-token" &&
+      originalRequest.url !== "/api/auth/verify-token" // Misma exclusión aquí
     ) {
       originalRequest._retry = true;
 

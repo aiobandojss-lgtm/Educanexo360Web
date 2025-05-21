@@ -14,6 +14,7 @@ const API_ROUTES = {
     FORGOT_PASSWORD: "/auth/forgot-password",
     RESET_PASSWORD: "/auth/reset-password",
     CHANGE_PASSWORD: "/auth/change-password",
+    VERIFY_TOKEN: "/auth/verify-token",
   },
 
   // Rutas de usuarios
