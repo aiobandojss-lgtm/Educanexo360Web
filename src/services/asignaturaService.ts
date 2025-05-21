@@ -1,95 +1,84 @@
 // src/services/asignaturaService.ts
-import axiosInstance from '../api/axiosConfig';
+import axiosInstance from "../api/axiosConfig";
 
-interface IAsignatura {
-  _id: string;
-  nombre: string;
-  cursoId: string;
-  docenteId: string;
-  escuelaId: string;
-  descripcion?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-class AsignaturaService {
-  /**
-   * Obtiene todas las asignaturas o filtra por parámetros
-   */
-  async obtenerAsignaturas(params?: {
-    cursoId?: string;
-    docenteId?: string;
-    escuelaId?: string;
-  }): Promise<IAsignatura[]> {
-    try {
-      const response = await axiosInstance.get('/api/asignaturas', { params });
-      return response.data.data;
-    } catch (error) {
-      console.error('Error al obtener asignaturas:', error);
-      throw error;
-    }
+// Función para normalizar una asignatura
+const normalizarAsignatura = (asignatura: any) => {
+  // Si la asignatura tiene docenteId pero no tiene docente
+  if (asignatura.docenteId && !asignatura.docente) {
+    asignatura.docente = asignatura.docenteId;
   }
 
-  /**
-   * Obtiene una asignatura por su ID
-   */
-  async obtenerAsignaturaPorId(id: string): Promise<IAsignatura> {
-    try {
-      const response = await axiosInstance.get(`/api/asignaturas/${id}`);
-      return response.data.data;
-    } catch (error) {
-      console.error('Error al obtener asignatura:', error);
-      throw error;
-    }
+  // Si la asignatura tiene docente pero es una cadena (ID)
+  if (asignatura.docente && typeof asignatura.docente === "string") {
+    asignatura.docenteId = asignatura.docente;
+    // No sobrescribir docente, se necesita para la representación
   }
 
-  /**
-   * Crea una nueva asignatura
-   */
-  async crearAsignatura(data: {
-    nombre: string;
-    cursoId: string;
-    docenteId: string;
-    descripcion?: string;
-  }): Promise<IAsignatura> {
-    try {
-      const response = await axiosInstance.post('/api/asignaturas', data);
-      return response.data.data;
-    } catch (error) {
-      console.error('Error al crear asignatura:', error);
-      throw error;
-    }
-  }
+  return asignatura;
+};
 
-  /**
-   * Actualiza una asignatura existente
-   */
-  async actualizarAsignatura(id: string, data: {
-    nombre?: string;
-    docenteId?: string;
-    descripcion?: string;
-  }): Promise<IAsignatura> {
+const asignaturaService = {
+  obtenerAsignaturas: async (params: any = {}) => {
     try {
-      const response = await axiosInstance.put(`/api/asignaturas/${id}`, data);
-      return response.data.data;
-    } catch (error) {
-      console.error('Error al actualizar asignatura:', error);
-      throw error;
-    }
-  }
+      const response = await axiosInstance.get("/asignaturas", { params });
 
-  /**
-   * Elimina una asignatura
-   */
-  async eliminarAsignatura(id: string): Promise<{ success: boolean; message: string }> {
-    try {
-      const response = await axiosInstance.delete(`/api/asignaturas/${id}`);
+      if (response.data?.success) {
+        const asignaturas = response.data.data.map(normalizarAsignatura);
+        return { success: true, data: asignaturas };
+      }
+
       return response.data;
     } catch (error) {
-      console.error('Error al eliminar asignatura:', error);
+      console.error("Error al obtener asignaturas:", error);
       throw error;
     }
-  }
-}
+  },
 
-export default new AsignaturaService();
+  obtenerAsignatura: async (id: string) => {
+    try {
+      const response = await axiosInstance.get(`/asignaturas/${id}`);
+
+      if (response.data?.success) {
+        const asignatura = normalizarAsignatura(response.data.data);
+        return { success: true, data: asignatura };
+      }
+
+      return response.data;
+    } catch (error) {
+      console.error(`Error al obtener asignatura ${id}:`, error);
+      throw error;
+    }
+  },
+
+  crearAsignatura: async (datos: any) => {
+    try {
+      const response = await axiosInstance.post("/asignaturas", datos);
+      return response.data;
+    } catch (error) {
+      console.error("Error al crear asignatura:", error);
+      throw error;
+    }
+  },
+
+  actualizarAsignatura: async (id: string, datos: any) => {
+    try {
+      const response = await axiosInstance.put(`/asignaturas/${id}`, datos);
+      return response.data;
+    } catch (error) {
+      console.error(`Error al actualizar asignatura ${id}:`, error);
+      throw error;
+    }
+  },
+
+  eliminarAsignatura: async (id: string) => {
+    try {
+      const response = await axiosInstance.delete(`/asignaturas/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error al eliminar asignatura ${id}:`, error);
+      throw error;
+    }
+  },
+};
+
+export default asignaturaService;

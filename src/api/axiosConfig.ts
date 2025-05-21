@@ -93,6 +93,17 @@ axiosInstance.interceptors.request.use(
   }
 );
 
+axiosInstance.interceptors.request.use((config) => {
+  // Añadir timestamp único a peticiones GET para evitar caché
+  if (config.method?.toLowerCase() === "get") {
+    config.params = {
+      ...config.params,
+      _t: new Date().getTime(), // Parámetro único para cada petición
+    };
+  }
+  return config;
+});
+
 // Aplicar el mismo interceptor a la instancia para archivos
 axiosFileInstance.interceptors.request.use(
   (config) => {
