@@ -1,4 +1,4 @@
-// src/Pages/RegistroPublico/FormularioRegistro.tsx
+// src/Pages/RegistroPublico/FormularioRegistro.tsx (ACTUALIZADO)
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -14,33 +14,50 @@ import {
   Alert,
   CircularProgress,
   styled,
-  MenuItem,
   Card,
   CardContent,
+  FormControlLabel,
+  Switch,
+  Chip,
 } from "@mui/material";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
-import { Add as AddIcon, Delete as DeleteIcon } from "@mui/icons-material";
+import {
+  Add as AddIcon,
+  Delete as DeleteIcon,
+  Search as SearchIcon,
+  Person as PersonIcon,
+  PersonAdd as PersonAddIcon,
+} from "@mui/icons-material";
 import dayjs, { Dayjs } from "dayjs";
-import registroService from "../../services/registroService";
-import type { EstudianteSolicitud } from "../../services/registroService";
+import registroService, {
+  EstudianteSolicitud,
+  EstudianteExistentePublico,
+} from "../../services/registroService";
 import invitacionService from "../../services/invitacionService";
 import cursoService from "../../services/cursoService";
+import BuscarEstudianteExistente from "../../pages/RegistroPublico/BuscarEstudianteExistente";
 
-// Interfaz para el estudiante en el formulario
+// Interfaz mejorada para el estudiante en el formulario
 interface EstudianteForm {
   nombre: string;
   apellidos: string;
   fechaNacimiento: Dayjs | null;
   cursoId: string;
   email?: string;
+  // NUEVOS CAMPOS
+  esExistente: boolean;
+  estudianteExistenteId?: string;
+  codigo_estudiante?: string;
 }
 
 // Componente estilizado para el contenedor de cada estudiante
 const EstudianteContainer = styled(Card)(({ theme }) => ({
   marginBottom: theme.spacing(3),
   position: "relative",
+  border: "1px solid",
+  borderColor: theme.palette.divider,
 }));
 
 const DeleteButton = styled(IconButton)(({ theme }) => ({
@@ -72,14 +89,21 @@ const FormularioRegistro: React.FC = () => {
       apellidos: "",
       fechaNacimiento: null,
       cursoId: invitacion?.cursoId || "",
+      esExistente: false,
     },
   ]);
 
-  // Estado para cursos
+  // Estados para UI
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [nombreCurso, setNombreCurso] = useState<string>("");
+
+  // Estados para búsqueda de estudiantes existentes
+  const [mostrarBusquedaEstudiante, setMostrarBusquedaEstudiante] =
+    useState(false);
+  const [estudianteIndexParaBusqueda, setEstudianteIndexParaBusqueda] =
+    useState<number>(-1);
 
   // Cargar información del curso si viene en la invitación
   useEffect(() => {
@@ -88,13 +112,11 @@ const FormularioRegistro: React.FC = () => {
         try {
           console.log("Datos de invitación recibidos:", invitacion);
 
-          // Verificar que cursoId sea un string y no un objeto
           const cursoId =
             typeof invitacion.cursoId === "string"
               ? invitacion.cursoId
               : invitacion.cursoId?._id || "";
 
-          // Verificar que el código de invitación esté completo
           const codigoInvitacion = invitacion.codigo || "";
 
           console.log("Solicitando info del curso con:", {
@@ -102,22 +124,18 @@ const FormularioRegistro: React.FC = () => {
             codigoInvitacion,
           });
 
-          // Solo hacer la solicitud si tenemos datos válidos
           if (cursoId && codigoInvitacion) {
-            // Usar el endpoint público que creamos
             const response = await cursoService.obtenerInfoCursoPublico(
               cursoId,
               codigoInvitacion
             );
 
             if (response) {
-              // Construir el nombre completo del curso
               const nombreCompleto = `${response.nombre || ""} - ${
                 response.grado || ""
               }° ${response.grupo || response.seccion || ""}`;
               setNombreCurso(nombreCompleto);
 
-              // Asegurarnos que estudiante.cursoId esté establecido correctamente
               setEstudiantes((prev) =>
                 prev.map((est) => ({
                   ...est,
@@ -138,7 +156,6 @@ const FormularioRegistro: React.FC = () => {
           console.error("Error al cargar información del curso:", err);
           setNombreCurso("Curso especificado en la invitación");
 
-          // Establecer el cursoId aunque haya error
           if (invitacion.cursoId) {
             const cursoIdString =
               typeof invitacion.cursoId === "string"
@@ -170,6 +187,7 @@ const FormularioRegistro: React.FC = () => {
         apellidos: "",
         fechaNacimiento: null,
         cursoId: invitacion?.cursoId || "",
+        esExistente: false,
       },
     ]);
   };
@@ -177,7 +195,6 @@ const FormularioRegistro: React.FC = () => {
   // Remover estudiante del formulario
   const eliminarEstudiante = (index: number) => {
     if (estudiantes.length <= 1) {
-      // Al menos debe haber un estudiante
       return;
     }
     const nuevosEstudiantes = [...estudiantes];
@@ -197,6 +214,71 @@ const FormularioRegistro: React.FC = () => {
       [field]: value,
     };
     setEstudiantes(nuevosEstudiantes);
+  };
+
+  // Abrir búsqueda de estudiante existente
+  const abrirBusquedaEstudiante = (index: number) => {
+    setEstudianteIndexParaBusqueda(index);
+    setMostrarBusquedaEstudiante(true);
+  };
+
+  // Manejar selección de estudiante existente
+  const handleSeleccionarEstudianteExistente = (
+    estudiante: EstudianteExistentePublico
+  ) => {
+    if (estudianteIndexParaBusqueda >= 0) {
+      const nuevosEstudiantes = [...estudiantes];
+      nuevosEstudiantes[estudianteIndexParaBusqueda] = {
+        ...nuevosEstudiantes[estudianteIndexParaBusqueda],
+        nombre: estudiante.nombre,
+        apellidos: estudiante.apellidos,
+        cursoId: estudiante.curso?._id || invitacion?.cursoId || "",
+        codigo_estudiante: estudiante.codigo_estudiante,
+        esExistente: true,
+        estudianteExistenteId: estudiante._id,
+        // Limpiar campos que no aplican para estudiantes existentes
+        email: "",
+        fechaNacimiento: null,
+      };
+      setEstudiantes(nuevosEstudiantes);
+    }
+  };
+
+  // Cambiar modo de estudiante (existente/nuevo)
+  const cambiarModoEstudiante = (index: number, esExistente: boolean) => {
+    const nuevosEstudiantes = [...estudiantes];
+
+    if (esExistente) {
+      // Cambiar a modo "existente" - limpiar campos
+      nuevosEstudiantes[index] = {
+        ...nuevosEstudiantes[index],
+        esExistente: true,
+        nombre: "",
+        apellidos: "",
+        email: "",
+        fechaNacimiento: null,
+        codigo_estudiante: "",
+        estudianteExistenteId: "",
+      };
+    } else {
+      // Cambiar a modo "nuevo" - limpiar campos de existente
+      nuevosEstudiantes[index] = {
+        ...nuevosEstudiantes[index],
+        esExistente: false,
+        estudianteExistenteId: "",
+        codigo_estudiante: "",
+      };
+    }
+
+    setEstudiantes(nuevosEstudiantes);
+  };
+
+  // Obtener estudiantes ya seleccionados (para evitar duplicados en búsqueda)
+  const obtenerEstudiantesYaSeleccionados = (): string[] => {
+    return estudiantes
+      .filter((est) => est.esExistente && est.estudianteExistenteId)
+      .map((est) => est.estudianteExistenteId!)
+      .filter(Boolean);
   };
 
   // Enviar el formulario
@@ -221,23 +303,41 @@ const FormularioRegistro: React.FC = () => {
     // Validar datos de cada estudiante
     for (let i = 0; i < estudiantes.length; i++) {
       const est = estudiantes[i];
-      if (!est.nombre.trim() || !est.apellidos.trim() || !est.cursoId) {
-        setError(
-          `Por favor, complete todos los campos obligatorios del estudiante ${
-            i + 1
-          }.`
-        );
-        return;
-      }
 
-      // Si se proporcionó email, validarlo
-      if (est.email && !emailRegex.test(est.email)) {
-        setError(
-          `Por favor, ingrese un correo electrónico válido para el estudiante ${
-            i + 1
-          }.`
-        );
-        return;
+      if (est.esExistente) {
+        // Validaciones para estudiante existente
+        if (
+          !est.estudianteExistenteId ||
+          !est.nombre.trim() ||
+          !est.apellidos.trim()
+        ) {
+          setError(
+            `Por favor, seleccione un estudiante existente válido para el estudiante ${
+              i + 1
+            }.`
+          );
+          return;
+        }
+      } else {
+        // Validaciones para estudiante nuevo
+        if (!est.nombre.trim() || !est.apellidos.trim() || !est.cursoId) {
+          setError(
+            `Por favor, complete todos los campos obligatorios del estudiante ${
+              i + 1
+            }.`
+          );
+          return;
+        }
+
+        // Si se proporcionó email, validarlo
+        if (est.email && !emailRegex.test(est.email)) {
+          setError(
+            `Por favor, ingrese un correo electrónico válido para el estudiante ${
+              i + 1
+            }.`
+          );
+          return;
+        }
       }
     }
 
@@ -261,9 +361,8 @@ const FormularioRegistro: React.FC = () => {
 
       console.log("Preparando solicitud con invitacionId:", invitacionId);
 
-      // Preparar los datos de estudiantes asegurando que cursoId sea una cadena válida
-      const estudiantesData = estudiantes.map((est) => {
-        // Asegurarse de que cursoId sea una cadena válida
+      // Preparar los datos de estudiantes
+      const estudiantesData: EstudianteSolicitud[] = estudiantes.map((est) => {
         let cursoId = est.cursoId;
         if (
           typeof cursoId === "object" &&
@@ -282,8 +381,12 @@ const FormularioRegistro: React.FC = () => {
           fechaNacimiento: est.fechaNacimiento
             ? est.fechaNacimiento.format("YYYY-MM-DD")
             : undefined,
-          cursoId: String(cursoId), // Convertir a string para asegurar
+          cursoId: String(cursoId),
           email: est.email,
+          codigo_estudiante: est.codigo_estudiante,
+          // NUEVOS CAMPOS
+          esExistente: est.esExistente,
+          estudianteExistenteId: est.estudianteExistenteId,
         };
       });
 
@@ -435,13 +538,63 @@ const FormularioRegistro: React.FC = () => {
             </Button>
           </Box>
 
+          <Alert severity="info" sx={{ mb: 3 }}>
+            <Typography variant="body2">
+              <strong>¿El estudiante ya está registrado en el sistema?</strong>
+              <br />• Si es <strong>estudiante existente</strong>: Búsquelo y
+              selecciónelo para asociarlo como acudiente adicional.
+              <br />• Si es <strong>estudiante nuevo</strong>: Complete todos
+              sus datos para crear una nueva cuenta.
+            </Typography>
+          </Alert>
+
           <LocalizationProvider dateAdapter={AdapterDayjs}>
             {estudiantes.map((estudiante, index) => (
-              <EstudianteContainer key={index}>
+              <EstudianteContainer
+                key={index}
+                sx={{
+                  borderColor: estudiante.esExistente
+                    ? "primary.main"
+                    : "divider",
+                  bgcolor: estudiante.esExistente
+                    ? "primary.50"
+                    : "background.paper",
+                }}
+              >
                 <CardContent>
-                  <Typography variant="subtitle1" gutterBottom>
-                    Estudiante {index + 1}
-                  </Typography>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      mb: 2,
+                    }}
+                  >
+                    <Typography variant="subtitle1" gutterBottom>
+                      Estudiante {index + 1}
+                      {estudiante.esExistente && (
+                        <Chip
+                          label="Existente"
+                          size="small"
+                          color="primary"
+                          sx={{ ml: 1 }}
+                        />
+                      )}
+                    </Typography>
+
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={estudiante.esExistente}
+                          onChange={(e) =>
+                            cambiarModoEstudiante(index, e.target.checked)
+                          }
+                          disabled={loading}
+                        />
+                      }
+                      label="¿Es estudiante existente?"
+                    />
+                  </Box>
 
                   {estudiantes.length > 1 && (
                     <DeleteButton
@@ -453,87 +606,153 @@ const FormularioRegistro: React.FC = () => {
                     </DeleteButton>
                   )}
 
-                  <Grid container spacing={2}>
-                    <Grid item xs={12} md={6}>
-                      <TextField
-                        label="Nombre"
-                        required
-                        fullWidth
-                        value={estudiante.nombre}
-                        onChange={(e) =>
-                          handleEstudianteChange(
-                            index,
-                            "nombre",
-                            e.target.value
-                          )
-                        }
-                        disabled={loading}
-                      />
-                    </Grid>
-                    <Grid item xs={12} md={6}>
-                      <TextField
-                        label="Apellidos"
-                        required
-                        fullWidth
-                        value={estudiante.apellidos}
-                        onChange={(e) =>
-                          handleEstudianteChange(
-                            index,
-                            "apellidos",
-                            e.target.value
-                          )
-                        }
-                        disabled={loading}
-                      />
-                    </Grid>
-                    <Grid item xs={12} md={6}>
-                      <DatePicker
-                        label="Fecha de Nacimiento"
-                        value={estudiante.fechaNacimiento}
-                        onChange={(date) =>
-                          handleEstudianteChange(index, "fechaNacimiento", date)
-                        }
-                        disabled={loading}
-                        sx={{ width: "100%" }}
-                      />
-                    </Grid>
-                    <Grid item xs={12} md={6}>
-                      {/* Si la invitación ya tiene un curso específico, mostrar un campo de solo lectura */}
-                      {invitacion?.cursoId ? (
-                        <TextField
-                          label="Curso"
-                          fullWidth
-                          value={nombreCurso}
-                          disabled={true}
-                          helperText="Curso especificado en la invitación"
-                        />
+                  {estudiante.esExistente ? (
+                    // MODO ESTUDIANTE EXISTENTE
+                    <Box>
+                      {estudiante.estudianteExistenteId ? (
+                        // Estudiante ya seleccionado
+                        <Box>
+                          <Alert severity="success" sx={{ mb: 2 }}>
+                            <Typography variant="body2">
+                              <strong>Estudiante seleccionado:</strong>{" "}
+                              {estudiante.nombre} {estudiante.apellidos}
+                              {estudiante.codigo_estudiante && (
+                                <span>
+                                  {" "}
+                                  (Código: {estudiante.codigo_estudiante})
+                                </span>
+                              )}
+                            </Typography>
+                          </Alert>
+                          <Button
+                            variant="outlined"
+                            startIcon={<SearchIcon />}
+                            onClick={() => abrirBusquedaEstudiante(index)}
+                            disabled={loading}
+                          >
+                            Cambiar Estudiante
+                          </Button>
+                        </Box>
                       ) : (
-                        <TextField
-                          label="Curso"
-                          fullWidth
-                          value="Error: no se pudo determinar el curso"
-                          disabled={true}
-                          error={true}
-                          helperText="No se pudo cargar la información del curso. Por favor, contacte al administrador."
-                        />
+                        // No hay estudiante seleccionado
+                        <Box sx={{ textAlign: "center", py: 3 }}>
+                          <PersonIcon
+                            sx={{
+                              fontSize: 48,
+                              color: "text.secondary",
+                              mb: 1,
+                            }}
+                          />
+                          <Typography
+                            variant="body1"
+                            color="text.secondary"
+                            paragraph
+                          >
+                            Haga clic en el botón para buscar y seleccionar un
+                            estudiante existente
+                          </Typography>
+                          <Button
+                            variant="contained"
+                            startIcon={<SearchIcon />}
+                            onClick={() => abrirBusquedaEstudiante(index)}
+                            disabled={loading}
+                            size="large"
+                          >
+                            Buscar Estudiante Existente
+                          </Button>
+                        </Box>
                       )}
-                      {/* Mantener un campo oculto para el ID del curso */}
-                      <input type="hidden" value={estudiante.cursoId} />
+                    </Box>
+                  ) : (
+                    // MODO ESTUDIANTE NUEVO
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} md={6}>
+                        <TextField
+                          label="Nombre"
+                          required
+                          fullWidth
+                          value={estudiante.nombre}
+                          onChange={(e) =>
+                            handleEstudianteChange(
+                              index,
+                              "nombre",
+                              e.target.value
+                            )
+                          }
+                          disabled={loading}
+                        />
+                      </Grid>
+                      <Grid item xs={12} md={6}>
+                        <TextField
+                          label="Apellidos"
+                          required
+                          fullWidth
+                          value={estudiante.apellidos}
+                          onChange={(e) =>
+                            handleEstudianteChange(
+                              index,
+                              "apellidos",
+                              e.target.value
+                            )
+                          }
+                          disabled={loading}
+                        />
+                      </Grid>
+                      <Grid item xs={12} md={6}>
+                        <DatePicker
+                          label="Fecha de Nacimiento"
+                          value={estudiante.fechaNacimiento}
+                          onChange={(date) =>
+                            handleEstudianteChange(
+                              index,
+                              "fechaNacimiento",
+                              date
+                            )
+                          }
+                          disabled={loading}
+                          sx={{ width: "100%" }}
+                        />
+                      </Grid>
+                      <Grid item xs={12} md={6}>
+                        {invitacion?.cursoId ? (
+                          <TextField
+                            label="Curso"
+                            fullWidth
+                            value={nombreCurso}
+                            disabled={true}
+                            helperText="Curso especificado en la invitación"
+                          />
+                        ) : (
+                          <TextField
+                            label="Curso"
+                            fullWidth
+                            value="Error: no se pudo determinar el curso"
+                            disabled={true}
+                            error={true}
+                            helperText="No se pudo cargar la información del curso. Por favor, contacte al administrador."
+                          />
+                        )}
+                        <input type="hidden" value={estudiante.cursoId} />
+                      </Grid>
+                      <Grid item xs={12}>
+                        <TextField
+                          label="Correo Electrónico (opcional)"
+                          type="email"
+                          fullWidth
+                          helperText="Si no se proporciona, se generará automáticamente"
+                          value={estudiante.email || ""}
+                          onChange={(e) =>
+                            handleEstudianteChange(
+                              index,
+                              "email",
+                              e.target.value
+                            )
+                          }
+                          disabled={loading}
+                        />
+                      </Grid>
                     </Grid>
-                    <Grid item xs={12}>
-                      <TextField
-                        label="Correo Electrónico (opcional)"
-                        type="email"
-                        fullWidth
-                        helperText="Si no se proporciona, se generará automáticamente"
-                        value={estudiante.email || ""}
-                        onChange={(e) =>
-                          handleEstudianteChange(index, "email", e.target.value)
-                        }
-                        disabled={loading}
-                      />
-                    </Grid>
-                  </Grid>
+                  )}
                 </CardContent>
               </EstudianteContainer>
             ))}
@@ -559,6 +778,15 @@ const FormularioRegistro: React.FC = () => {
           </Box>
         </form>
       </Paper>
+
+      {/* Diálogo de búsqueda de estudiantes existentes */}
+      <BuscarEstudianteExistente
+        open={mostrarBusquedaEstudiante}
+        onClose={() => setMostrarBusquedaEstudiante(false)}
+        onSeleccionar={handleSeleccionarEstudianteExistente}
+        codigoInvitacion={invitacion.codigo}
+        estudiantesYaSeleccionados={obtenerEstudiantesYaSeleccionados()}
+      />
     </Container>
   );
 };

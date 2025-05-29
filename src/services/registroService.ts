@@ -1,9 +1,8 @@
-// src/services/registroService.ts
+// src/services/registroService.ts (Frontend - ACTUALIZADO)
 import axios from "axios";
 import api from "../api/axiosConfig";
-import API_ROUTES from "../constants/apiRoutes";
 
-// Interfaces para el módulo de registro
+// Interfaces actualizadas para el módulo de registro
 export interface EstudianteSolicitud {
   nombre: string;
   apellidos: string;
@@ -11,6 +10,9 @@ export interface EstudianteSolicitud {
   cursoId: string;
   codigo_estudiante?: string;
   email?: string;
+  // NUEVOS CAMPOS
+  esExistente?: boolean;
+  estudianteExistenteId?: string;
 }
 
 export interface SolicitudRegistro {
@@ -41,7 +43,31 @@ export interface CrearSolicitudDto {
   estudiantes: EstudianteSolicitud[];
 }
 
-// Alias para mantener compatibilidad con las importaciones existentes
+// NUEVAS INTERFACES PARA BÚSQUEDA DE ESTUDIANTES
+export interface EstudianteExistentePublico {
+  _id: string;
+  nombre: string;
+  apellidos: string;
+  codigo_estudiante?: string;
+  curso?: {
+    _id: string;
+    nombre: string;
+    grado: string;
+    grupo: string;
+  };
+  tieneAcudientes: boolean;
+  numeroAcudientes: number;
+}
+
+export interface BusquedaEstudiantesParams {
+  codigoInvitacion: string;
+  nombre?: string;
+  apellidos?: string;
+  email?: string;
+  codigo_estudiante?: string;
+}
+
+// Alias para mantener compatibilidad
 export type SolicitudRegistroInput = CrearSolicitudDto;
 
 interface PaginatedResponse<T> {
@@ -67,7 +93,6 @@ const registroService = {
     try {
       console.log("Enviando solicitud de registro:", JSON.stringify(data));
 
-      // Usar el cliente público para llamadas sin autenticación
       const response = await publicApi.post(
         "/api/public/registro/solicitudes",
         data
@@ -90,6 +115,83 @@ const registroService = {
     }
   },
 
+  // NUEVOS MÉTODOS PARA BÚSQUEDA DE ESTUDIANTES EXISTENTES
+
+  /**
+   * Busca estudiantes existentes usando código de invitación
+   */
+  async buscarEstudiantesExistentes(
+    params: BusquedaEstudiantesParams
+  ): Promise<EstudianteExistentePublico[]> {
+    try {
+      const { codigoInvitacion, ...queryParams } = params;
+
+      // Limpiar parámetros vacíos
+      const cleanParams = Object.fromEntries(
+        Object.entries(queryParams).filter(
+          ([_, value]) => value && value.trim()
+        )
+      );
+
+      console.log("Buscando estudiantes existentes con:", {
+        codigoInvitacion,
+        cleanParams,
+      });
+
+      const response = await publicApi.get(
+        `/api/public/estudiantes/buscar/${codigoInvitacion}`,
+        { params: cleanParams }
+      );
+
+      console.log("Respuesta de búsqueda de estudiantes:", response.data);
+
+      if (response.data && response.data.data) {
+        return response.data.data;
+      }
+      return response.data || [];
+    } catch (error: unknown) {
+      console.error("Error al buscar estudiantes existentes:", error);
+      if (axios.isAxiosError(error)) {
+        console.error("Detalles del error:", error.response?.data);
+      }
+      return []; // Retornar array vacío en caso de error
+    }
+  },
+
+  /**
+   * Obtiene información de un estudiante específico
+   */
+  async obtenerEstudianteExistente(
+    estudianteId: string,
+    codigoInvitacion: string
+  ): Promise<EstudianteExistentePublico | null> {
+    try {
+      console.log("Obteniendo estudiante existente:", {
+        estudianteId,
+        codigoInvitacion,
+      });
+
+      const response = await publicApi.get(
+        `/api/public/estudiantes/${estudianteId}/invitacion/${codigoInvitacion}`
+      );
+
+      console.log("Respuesta de estudiante específico:", response.data);
+
+      if (response.data && response.data.data) {
+        return response.data.data;
+      }
+      return response.data;
+    } catch (error: unknown) {
+      console.error("Error al obtener estudiante existente:", error);
+      if (axios.isAxiosError(error)) {
+        console.error("Detalles del error:", error.response?.data);
+      }
+      return null;
+    }
+  },
+
+  // MÉTODOS EXISTENTES SIN CAMBIOS
+
   /**
    * Obtiene solicitudes pendientes
    */
@@ -101,7 +203,6 @@ const registroService = {
       console.log("Solicitando solicitudes con estado PENDIENTE");
       console.log(`Parámetros: pagina=${pagina}, limite=${limite}`);
 
-      // Usamos la ruta correcta basada en cómo está configurado el backend
       const response = await api.get("/api/registro/solicitudes", {
         params: {
           pagina,
@@ -112,14 +213,12 @@ const registroService = {
 
       console.log("Respuesta de solicitudes pendientes:", response.data);
 
-      // Manejar diferentes estructuras de respuesta
       if (response.data && response.data.data) {
         return response.data.data;
       } else if (response.data) {
         return response.data;
       }
 
-      // Proporcionar una estructura vacía pero válida para evitar errores
       return {
         total: 0,
         pagina,
@@ -134,7 +233,6 @@ const registroService = {
         console.error("Detalles del error:", error.message);
       }
 
-      // Proporcionar una estructura vacía pero válida para evitar errores
       return {
         total: 0,
         pagina,
@@ -158,7 +256,6 @@ const registroService = {
         params.estado = estado;
       }
 
-      // Usamos la ruta correcta basada en cómo está configurado el backend
       const response = await api.get("/api/registro/solicitudes/historial", {
         params,
       });
@@ -177,7 +274,6 @@ const registroService = {
         console.error("Detalles del error:", error.message);
       }
 
-      // Proporcionar una estructura vacía pero válida para evitar errores
       return {
         total: 0,
         pagina,
@@ -192,7 +288,6 @@ const registroService = {
    */
   async obtenerSolicitudPorId(id: string): Promise<SolicitudRegistro> {
     try {
-      // Usamos la ruta correcta basada en cómo está configurado el backend
       const response = await api.get(`/api/registro/solicitudes/${id}`);
 
       console.log("Respuesta de solicitud por ID:", response.data);
@@ -217,7 +312,6 @@ const registroService = {
    */
   async aprobarSolicitud(id: string): Promise<any> {
     try {
-      // Usamos la ruta correcta basada en cómo está configurado el backend
       const response = await api.put(`/api/registro/solicitudes/${id}/aprobar`);
 
       console.log("Respuesta de aprobación:", response.data);
@@ -242,7 +336,6 @@ const registroService = {
    */
   async rechazarSolicitud(id: string, motivo: string): Promise<any> {
     try {
-      // Usamos la ruta correcta basada en cómo está configurado el backend
       const response = await api.put(
         `/api/registro/solicitudes/${id}/rechazar`,
         {
