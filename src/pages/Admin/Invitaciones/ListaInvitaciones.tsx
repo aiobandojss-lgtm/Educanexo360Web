@@ -43,6 +43,7 @@ import {
 import invitacionService, {
   Invitacion,
 } from "../../../services/invitacionService";
+import cursoService from "../../../services/cursoService";
 
 // Función para obtener color de chip según estado
 const getEstadoColor = (estado: string) => {
@@ -103,6 +104,12 @@ const ListaInvitaciones: React.FC = () => {
     tipo: "success" | "error" | "warning" | "info";
   } | null>(null);
 
+  // Estados para información adicional
+  const [cursosInfo, setCursosInfo] = useState<{ [key: string]: any }>({});
+  const [estudiantesInfo, setEstudiantesInfo] = useState<{
+    [key: string]: any;
+  }>({});
+
   // Paginación y filtros
   const [pagina, setPagina] = useState(1);
   const [limite, setLimite] = useState(10);
@@ -115,6 +122,119 @@ const ListaInvitaciones: React.FC = () => {
     console.log("useEffect ejecutándose - Cargando invitaciones");
     cargarInvitaciones();
   }, [pagina, limite]);
+
+  // Función para cargar información adicional de cursos y estudiantes
+  const cargarInformacionAdicional = async (invitaciones: Invitacion[]) => {
+    const cursosMap: { [key: string]: any } = {};
+    const estudiantesMap: { [key: string]: any } = {};
+
+    // Obtener IDs únicos de cursos y estudiantes
+    const cursosIds = Array.from(
+      new Set(
+        invitaciones
+          .filter((inv) => inv.cursoId)
+          .map((inv) => inv.cursoId as string)
+      )
+    );
+
+    const estudiantesIds = Array.from(
+      new Set(
+        invitaciones
+          .filter((inv) => inv.estudianteId)
+          .map((inv) => inv.estudianteId as string)
+      )
+    );
+
+    try {
+      // Cargar información de cursos
+      for (const cursoId of cursosIds) {
+        try {
+          const curso = await cursoService.obtenerCursoPorId(cursoId);
+          cursosMap[cursoId] = curso;
+        } catch (err) {
+          console.error(`Error al cargar curso ${cursoId}:`, err);
+          cursosMap[cursoId] = {
+            nombre: "Curso no encontrado",
+            grado: "",
+            seccion: "",
+            grupo: "",
+          };
+        }
+      }
+
+      setCursosInfo(cursosMap);
+      setEstudiantesInfo(estudiantesMap);
+    } catch (error) {
+      console.error("Error al cargar información adicional:", error);
+    }
+  };
+
+  // Función para mostrar destino de la invitación
+  const mostrarDestinoInvitacion = (invitacion: Invitacion) => {
+    switch (invitacion.tipo) {
+      case "CURSO":
+        if (invitacion.cursoId && cursosInfo[invitacion.cursoId as string]) {
+          const curso = cursosInfo[invitacion.cursoId as string];
+          return (
+            <Box>
+              <Typography variant="body2" fontWeight="medium">
+                📚 {curso.nombre}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {curso.grado}° {curso.seccion || curso.grupo}
+              </Typography>
+            </Box>
+          );
+        }
+        return (
+          <Box>
+            <Typography variant="body2" color="text.secondary">
+              📚 Curso (cargando...)
+            </Typography>
+          </Box>
+        );
+
+      case "ESTUDIANTE_ESPECIFICO":
+        const cursoInfo =
+          invitacion.cursoId && cursosInfo[invitacion.cursoId as string];
+        return (
+          <Box>
+            <Typography variant="body2" fontWeight="medium">
+              🎓 Estudiante Específico
+            </Typography>
+            {cursoInfo && (
+              <Typography variant="caption" color="text.secondary">
+                En: {cursoInfo.nombre} - {cursoInfo.grado}°{" "}
+                {cursoInfo.seccion || cursoInfo.grupo}
+              </Typography>
+            )}
+          </Box>
+        );
+
+      case "PERSONAL":
+        return (
+          <Box>
+            <Typography
+              variant="body2"
+              fontWeight="medium"
+              color="primary.main"
+            >
+              👤 Invitación Personal
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Sin curso específico
+            </Typography>
+          </Box>
+        );
+
+      default:
+        return (
+          <Typography variant="body2" color="text.secondary">
+            Tipo desconocido
+          </Typography>
+        );
+    }
+  };
 
   const cargarInvitaciones = async () => {
     console.log("Iniciando carga de invitaciones");
@@ -133,6 +253,9 @@ const ListaInvitaciones: React.FC = () => {
       const invitacionesArray = resp?.invitaciones || [];
       setInvitaciones(invitacionesArray);
       setTotal(resp?.total || 0);
+
+      // Cargar información adicional de cursos y estudiantes
+      await cargarInformacionAdicional(invitacionesArray);
 
       // Log para ver los resultados
       console.log(`Cargadas ${invitacionesArray.length} invitaciones`);
@@ -404,7 +527,7 @@ const ListaInvitaciones: React.FC = () => {
             <TableHead>
               <TableRow>
                 <TableCell>Código</TableCell>
-                <TableCell>Tipo</TableCell>
+                <TableCell>Curso/Destino</TableCell>
                 <TableCell>Estado</TableCell>
                 <TableCell align="center">Usos</TableCell>
                 <TableCell>Fecha de Creación</TableCell>
@@ -478,7 +601,7 @@ const ListaInvitaciones: React.FC = () => {
                       </Tooltip>
                     </Box>
                   </TableCell>
-                  <TableCell>{traducirTipo(inv.tipo)}</TableCell>
+                  <TableCell>{mostrarDestinoInvitacion(inv)}</TableCell>
                   <TableCell>
                     <Chip
                       label={inv.estado}

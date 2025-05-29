@@ -69,6 +69,38 @@ const DetalleInvitacion: React.FC = () => {
   const [copiado, setCopiado] = useState(false);
   const [openRevocDialog, setOpenRevocDialog] = useState(false);
 
+  // Función para obtener descripción completa de la invitación
+  const obtenerDescripcionCompleta = (invitacion: Invitacion) => {
+    switch (invitacion.tipo) {
+      case "CURSO":
+        return {
+          titulo: "📚 Invitación por Curso",
+          descripcion:
+            "Permite registrar múltiples acudientes para un curso específico",
+          icono: "📚",
+        };
+      case "ESTUDIANTE_ESPECIFICO":
+        return {
+          titulo: "🎓 Invitación para Estudiante Específico",
+          descripcion:
+            "Para registrar el acudiente de un estudiante en particular",
+          icono: "🎓",
+        };
+      case "PERSONAL":
+        return {
+          titulo: "👤 Invitación Personal",
+          descripcion: "Invitación general sin curso específico",
+          icono: "👤",
+        };
+      default:
+        return {
+          titulo: invitacion.tipo,
+          descripcion: "Tipo de invitación",
+          icono: "📋",
+        };
+    }
+  };
+
   useEffect(() => {
     const cargarInvitacion = async () => {
       if (!id) return;
@@ -87,10 +119,13 @@ const DetalleInvitacion: React.FC = () => {
               data.cursoId as string
             );
             setNombreCurso(
-              `${curso.nombre} - ${curso.grado}° ${curso.seccion}`
+              `${curso.nombre} - ${curso.grado}° ${
+                curso.seccion || curso.grupo
+              }`
             );
           } catch (err) {
             console.error("Error al cargar datos del curso:", err);
+            setNombreCurso("Curso no encontrado");
           }
         }
 
@@ -147,20 +182,6 @@ const DetalleInvitacion: React.FC = () => {
       } else {
         setError("Error al revocar la invitación.");
       }
-    }
-  };
-
-  // Traducir tipo de invitación
-  const traducirTipo = (tipo: string) => {
-    switch (tipo) {
-      case "CURSO":
-        return "Invitación por Curso";
-      case "ESTUDIANTE_ESPECIFICO":
-        return "Invitación para Estudiante";
-      case "PERSONAL":
-        return "Invitación Personal";
-      default:
-        return tipo;
     }
   };
 
@@ -260,68 +281,197 @@ const DetalleInvitacion: React.FC = () => {
         </Box>
 
         <Grid container spacing={3}>
-          <Grid item xs={12} sm={6}>
-            <Typography variant="subtitle2">Tipo</Typography>
-            <Typography variant="body1">
-              {traducirTipo(invitacion.tipo)}
-            </Typography>
+          {/* Tipo de Invitación - MEJORADO */}
+          <Grid item xs={12}>
+            <Paper
+              variant="outlined"
+              sx={{ p: 2, backgroundColor: "primary.50" }}
+            >
+              <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+                <Typography
+                  variant="h6"
+                  sx={{ display: "flex", alignItems: "center" }}
+                >
+                  {obtenerDescripcionCompleta(invitacion).icono}
+                  <Box component="span" sx={{ ml: 1 }}>
+                    {obtenerDescripcionCompleta(invitacion).titulo}
+                  </Box>
+                </Typography>
+                <Box sx={{ ml: 2 }}>
+                  <Chip
+                    label={invitacion.estado}
+                    color={getEstadoColor(invitacion.estado) as any}
+                    size="small"
+                  />
+                </Box>
+              </Box>
+              <Typography variant="body2" color="text.secondary">
+                {obtenerDescripcionCompleta(invitacion).descripcion}
+              </Typography>
+            </Paper>
           </Grid>
 
-          <Grid item xs={12} sm={6}>
-            <Typography variant="subtitle2">Estado</Typography>
-            <Chip
-              label={invitacion.estado}
-              color={getEstadoColor(invitacion.estado) as any}
-              size="small"
-            />
-          </Grid>
-
+          {/* Información del Curso - MEJORADO */}
           {nombreCurso && (
-            <Grid item xs={12} sm={6}>
-              <Typography variant="subtitle2">Curso</Typography>
-              <Typography variant="body1">{nombreCurso}</Typography>
+            <Grid item xs={12}>
+              <Box
+                sx={{
+                  p: 2,
+                  border: "1px solid",
+                  borderColor: "divider",
+                  borderRadius: 1,
+                }}
+              >
+                <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                  🏫 Información del Curso
+                </Typography>
+                <Typography variant="h6" color="primary.main">
+                  {nombreCurso}
+                </Typography>
+                {invitacion.tipo === "CURSO" && (
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mt: 1 }}
+                  >
+                    Los acudientes podrán registrar estudiantes para este curso
+                    específico
+                  </Typography>
+                )}
+                {invitacion.tipo === "ESTUDIANTE_ESPECIFICO" && (
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mt: 1 }}
+                  >
+                    Esta invitación está destinada para el acudiente de un
+                    estudiante específico en este curso
+                  </Typography>
+                )}
+              </Box>
             </Grid>
           )}
 
-          {nombreEstudiante && (
-            <Grid item xs={12} sm={6}>
-              <Typography variant="subtitle2">Estudiante</Typography>
-              <Typography variant="body1">{nombreEstudiante}</Typography>
+          {/* Información del Estudiante - MEJORADO */}
+          {invitacion.tipo === "ESTUDIANTE_ESPECIFICO" && (
+            <Grid item xs={12}>
+              <Box
+                sx={{
+                  p: 2,
+                  border: "1px solid",
+                  borderColor: "warning.main",
+                  borderRadius: 1,
+                  bgcolor: "warning.50",
+                }}
+              >
+                <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                  🎓 Estudiante Específico
+                </Typography>
+                <Typography variant="body1">
+                  Esta invitación está destinada únicamente para registrar al
+                  acudiente de un estudiante específico
+                </Typography>
+                {nombreEstudiante && (
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mt: 1 }}
+                  >
+                    Estudiante: {nombreEstudiante}
+                  </Typography>
+                )}
+              </Box>
             </Grid>
           )}
 
+          {/* Invitación Personal - MEJORADO */}
+          {invitacion.tipo === "PERSONAL" && (
+            <Grid item xs={12}>
+              <Box
+                sx={{
+                  p: 2,
+                  border: "1px solid",
+                  borderColor: "info.main",
+                  borderRadius: 1,
+                  bgcolor: "info.50",
+                }}
+              >
+                <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                  👤 Invitación Personal
+                </Typography>
+                <Typography variant="body1">
+                  Esta es una invitación general que no está vinculada a un
+                  curso específico
+                </Typography>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mt: 1 }}
+                >
+                  El acudiente podrá seleccionar el curso durante el proceso de
+                  registro
+                </Typography>
+              </Box>
+            </Grid>
+          )}
+
+          {/* Estadísticas de Uso - MEJORADO */}
           <Grid item xs={12} sm={6}>
-            <Typography variant="subtitle2">Usos</Typography>
-            <Typography variant="body1">
-              {invitacion.usosActuales} de {invitacion.cantidadUsos} (
-              {invitacion.cantidadUsos - invitacion.usosActuales} disponibles)
-            </Typography>
+            <Box
+              sx={{
+                textAlign: "center",
+                p: 2,
+                border: "1px solid",
+                borderColor: "divider",
+                borderRadius: 1,
+              }}
+            >
+              <Typography variant="h4" color="primary.main" fontWeight="bold">
+                {invitacion.usosActuales}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                de {invitacion.cantidadUsos} usos
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                ({invitacion.cantidadUsos - invitacion.usosActuales}{" "}
+                disponibles)
+              </Typography>
+            </Box>
           </Grid>
 
+          {/* Fechas */}
           <Grid item xs={12} sm={6}>
             <Typography variant="subtitle2">Fecha de Creación</Typography>
-            <Typography variant="body1">
+            <Typography variant="body1" gutterBottom>
               {formatDate(invitacion.fechaCreacion)}
             </Typography>
+
+            {invitacion.fechaExpiracion && (
+              <>
+                <Typography variant="subtitle2" sx={{ mt: 2 }}>
+                  Fecha de Expiración
+                </Typography>
+                <Typography
+                  variant="body1"
+                  color="warning.main"
+                  fontWeight="medium"
+                >
+                  {formatDate(invitacion.fechaExpiracion)}
+                </Typography>
+              </>
+            )}
+
+            {invitacion.fechaUtilizacion && (
+              <>
+                <Typography variant="subtitle2" sx={{ mt: 2 }}>
+                  Última Utilización
+                </Typography>
+                <Typography variant="body1">
+                  {formatDate(invitacion.fechaUtilizacion)}
+                </Typography>
+              </>
+            )}
           </Grid>
-
-          {invitacion.fechaExpiracion && (
-            <Grid item xs={12} sm={6}>
-              <Typography variant="subtitle2">Fecha de Expiración</Typography>
-              <Typography variant="body1">
-                {formatDate(invitacion.fechaExpiracion)}
-              </Typography>
-            </Grid>
-          )}
-
-          {invitacion.fechaUtilizacion && (
-            <Grid item xs={12} sm={6}>
-              <Typography variant="subtitle2">Última Utilización</Typography>
-              <Typography variant="body1">
-                {formatDate(invitacion.fechaUtilizacion)}
-              </Typography>
-            </Grid>
-          )}
         </Grid>
 
         {invitacion.registros && invitacion.registros.length > 0 && (
