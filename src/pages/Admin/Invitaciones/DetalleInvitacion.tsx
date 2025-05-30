@@ -35,6 +35,7 @@ import invitacionService, {
   Invitacion,
 } from "../../../services/invitacionService";
 import cursoService from "../../../services/cursoService";
+import { extraerIdComoString } from "../../../utils/mongoUtils";
 
 // Función para obtener color de chip según estado
 const getEstadoColor = (estado: string) => {
@@ -115,24 +116,42 @@ const DetalleInvitacion: React.FC = () => {
         // Cargar información adicional si es necesario
         if (data.cursoId) {
           try {
-            const curso = await cursoService.obtenerCursoPorId(
-              data.cursoId as string
-            );
+            const cursoIdString = extraerIdComoString(data.cursoId);
+            console.log("🔍 Cargando curso:", {
+              original: data.cursoId,
+              extraido: cursoIdString,
+              tipo: typeof data.cursoId,
+            });
+
+            const curso = await cursoService.obtenerCursoPorId(cursoIdString);
             setNombreCurso(
               `${curso.nombre} - ${curso.grado}° ${
                 curso.seccion || curso.grupo
               }`
             );
-          } catch (err) {
-            console.error("Error al cargar datos del curso:", err);
-            setNombreCurso("Curso no encontrado");
+            console.log("✅ Curso cargado exitosamente:", curso.nombre);
+          } catch (err: any) {
+            console.error("❌ Error al cargar datos del curso:", {
+              cursoId: data.cursoId,
+              status: err.response?.status,
+              message: err.response?.data?.message || err.message,
+            });
+
+            // Mostrar mensaje de error específico según el tipo
+            if (err.response?.status === 401) {
+              setNombreCurso("🔒 Error de autenticación");
+            } else if (err.response?.status === 403) {
+              setNombreCurso("🚫 Sin permisos para ver el curso");
+            } else if (err.response?.status === 404) {
+              setNombreCurso("❓ Curso no encontrado");
+            } else {
+              setNombreCurso("❌ Error al cargar curso");
+            }
           }
         }
 
         if (data.estudianteId) {
-          // Aquí podrías llamar a un servicio para obtener el nombre del estudiante
-          // Por ahora, usamos un valor genérico
-          setNombreEstudiante("Estudiante");
+          setNombreEstudiante("Estudiante específico");
         }
       } catch (err: any) {
         console.error("Error al cargar invitación:", err);

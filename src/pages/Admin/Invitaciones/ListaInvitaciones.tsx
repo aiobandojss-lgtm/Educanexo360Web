@@ -44,6 +44,7 @@ import invitacionService, {
   Invitacion,
 } from "../../../services/invitacionService";
 import cursoService from "../../../services/cursoService";
+import { extraerIdComoString } from "../../../utils/mongoUtils";
 
 // Función para obtener color de chip según estado
 const getEstadoColor = (estado: string) => {
@@ -106,9 +107,6 @@ const ListaInvitaciones: React.FC = () => {
 
   // Estados para información adicional
   const [cursosInfo, setCursosInfo] = useState<{ [key: string]: any }>({});
-  const [estudiantesInfo, setEstudiantesInfo] = useState<{
-    [key: string]: any;
-  }>({});
 
   // Paginación y filtros
   const [pagina, setPagina] = useState(1);
@@ -123,49 +121,76 @@ const ListaInvitaciones: React.FC = () => {
     cargarInvitaciones();
   }, [pagina, limite]);
 
-  // Función para cargar información adicional de cursos y estudiantes
+  // Función para cargar información adicional de cursos
   const cargarInformacionAdicional = async (invitaciones: Invitacion[]) => {
     const cursosMap: { [key: string]: any } = {};
-    const estudiantesMap: { [key: string]: any } = {};
-
-    // Obtener IDs únicos de cursos y estudiantes
     const cursosIds = Array.from(
       new Set(
         invitaciones
           .filter((inv) => inv.cursoId)
-          .map((inv) => inv.cursoId as string)
+          .map((inv) => extraerIdComoString(inv.cursoId))
+          .filter((id) => id && id.length > 0)
       )
     );
 
-    const estudiantesIds = Array.from(
-      new Set(
-        invitaciones
-          .filter((inv) => inv.estudianteId)
-          .map((inv) => inv.estudianteId as string)
-      )
-    );
+    console.log("🔍 IDs de cursos a cargar:", cursosIds);
 
     try {
-      // Cargar información de cursos
       for (const cursoId of cursosIds) {
         try {
+          console.log(`📚 Cargando curso: ${cursoId}`);
           const curso = await cursoService.obtenerCursoPorId(cursoId);
           cursosMap[cursoId] = curso;
-        } catch (err) {
-          console.error(`Error al cargar curso ${cursoId}:`, err);
-          cursosMap[cursoId] = {
-            nombre: "Curso no encontrado",
-            grado: "",
-            seccion: "",
-            grupo: "",
-          };
+          console.log(`✅ Curso cargado exitosamente:`, {
+            id: cursoId,
+            nombre: curso.nombre,
+            grado: curso.grado,
+            grupo: curso.grupo || curso.seccion,
+          });
+        } catch (err: any) {
+          console.error(`❌ Error al cargar curso ${cursoId}:`, {
+            status: err.response?.status,
+            message: err.response?.data?.message || err.message,
+          });
+
+          if (err.response?.status === 401) {
+            cursosMap[cursoId] = {
+              nombre: "🔒 Sin autenticación",
+              grado: "",
+              seccion: "",
+              grupo: "",
+            };
+          } else if (err.response?.status === 403) {
+            cursosMap[cursoId] = {
+              nombre: "🚫 Sin permisos",
+              grado: "",
+              seccion: "",
+              grupo: "",
+            };
+          } else if (err.response?.status === 404) {
+            cursosMap[cursoId] = {
+              nombre: "❓ Curso no encontrado",
+              grado: "",
+              seccion: "",
+              grupo: "",
+            };
+          } else {
+            cursosMap[cursoId] = {
+              nombre: "❌ Error al cargar",
+              grado: "",
+              seccion: "",
+              grupo: "",
+            };
+          }
         }
       }
 
       setCursosInfo(cursosMap);
-      setEstudiantesInfo(estudiantesMap);
+      console.log("✅ Información adicional cargada:", {
+        cursos: Object.keys(cursosMap).length,
+      });
     } catch (error) {
-      console.error("Error al cargar información adicional:", error);
+      console.error("💥 Error general al cargar información adicional:", error);
     }
   };
 
@@ -173,8 +198,9 @@ const ListaInvitaciones: React.FC = () => {
   const mostrarDestinoInvitacion = (invitacion: Invitacion) => {
     switch (invitacion.tipo) {
       case "CURSO":
-        if (invitacion.cursoId && cursosInfo[invitacion.cursoId as string]) {
-          const curso = cursosInfo[invitacion.cursoId as string];
+        const cursoIdString = extraerIdComoString(invitacion.cursoId);
+        if (cursoIdString && cursosInfo[cursoIdString]) {
+          const curso = cursosInfo[cursoIdString];
           return (
             <Box>
               <Typography variant="body2" fontWeight="medium">
@@ -195,8 +221,8 @@ const ListaInvitaciones: React.FC = () => {
         );
 
       case "ESTUDIANTE_ESPECIFICO":
-        const cursoInfo =
-          invitacion.cursoId && cursosInfo[invitacion.cursoId as string];
+        const cursoIdEstudiante = extraerIdComoString(invitacion.cursoId);
+        const cursoInfo = cursoIdEstudiante && cursosInfo[cursoIdEstudiante];
         return (
           <Box>
             <Typography variant="body2" fontWeight="medium">
@@ -247,17 +273,14 @@ const ListaInvitaciones: React.FC = () => {
         limite,
         estadoFiltro || undefined
       );
-      console.log("Respuesta recibida:", resp);
 
-      // Asegurarse de que invitaciones es siempre un array, incluso si es undefined
       const invitacionesArray = resp?.invitaciones || [];
       setInvitaciones(invitacionesArray);
       setTotal(resp?.total || 0);
 
-      // Cargar información adicional de cursos y estudiantes
+      // Cargar información adicional de cursos
       await cargarInformacionAdicional(invitacionesArray);
 
-      // Log para ver los resultados
       console.log(`Cargadas ${invitacionesArray.length} invitaciones`);
     } catch (err: any) {
       console.error("Error al cargar invitaciones:", err);
@@ -265,7 +288,7 @@ const ListaInvitaciones: React.FC = () => {
         "Error al cargar la lista de invitaciones: " +
           (err.message || "Error desconocido")
       );
-      setInvitaciones([]); // ¡Importante! Siempre inicializar como array vacío
+      setInvitaciones([]);
     } finally {
       setLoading(false);
     }
@@ -273,7 +296,6 @@ const ListaInvitaciones: React.FC = () => {
 
   // Función para copiar código al portapapeles
   const copiarCodigo = (codigo: string, estado: string) => {
-    // No permitir copiar códigos de invitaciones revocadas o expiradas
     if (estado === "REVOCADO") {
       setMensajeAlerta({
         texto:
@@ -342,7 +364,6 @@ const ListaInvitaciones: React.FC = () => {
       });
       setTimeout(() => setMensajeAlerta(null), 4000);
 
-      // Actualizar la lista
       cargarInvitaciones();
     } catch (err: any) {
       console.error("Error al revocar invitación:", err);
@@ -365,15 +386,14 @@ const ListaInvitaciones: React.FC = () => {
   // Manejar cambio de filtro de estado
   const handleEstadoChange = (e: React.ChangeEvent<{ value: unknown }>) => {
     setEstadoFiltro(e.target.value as string);
-    setPagina(1); // Resetear a primera página
+    setPagina(1);
 
-    // Aplicar filtro después de un breve retraso
     setTimeout(() => {
       cargarInvitaciones();
     }, 100);
   };
 
-  // Filtrar invitaciones con protección contra undefined
+  // Filtrar invitaciones
   const invitacionesFiltradas = (invitaciones || []).filter((inv) => {
     const matchesCodigo =
       inv?.codigo?.toLowerCase().includes((filtro || "").toLowerCase()) ||
@@ -381,20 +401,6 @@ const ListaInvitaciones: React.FC = () => {
     const matchesEstado = !estadoFiltro || inv?.estado === estadoFiltro;
     return matchesCodigo && matchesEstado;
   });
-
-  // Traducir tipo de invitación
-  const traducirTipo = (tipo: string) => {
-    switch (tipo) {
-      case "CURSO":
-        return "Invitación por Curso";
-      case "ESTUDIANTE_ESPECIFICO":
-        return "Invitación para Estudiante";
-      case "PERSONAL":
-        return "Invitación Personal";
-      default:
-        return tipo;
-    }
-  };
 
   return (
     <Container maxWidth="lg">
@@ -462,7 +468,6 @@ const ListaInvitaciones: React.FC = () => {
             md={4}
             sx={{ display: "flex", justifyContent: "flex-end", gap: 2 }}
           >
-            {/* Botón para refrescar manualmente */}
             <Button
               variant="outlined"
               onClick={cargarInvitaciones}
@@ -575,8 +580,6 @@ const ListaInvitaciones: React.FC = () => {
                         }
                       >
                         <span>
-                          {" "}
-                          {/* Wrapper para que Tooltip funcione con botón deshabilitado */}
                           <IconButton
                             size="small"
                             onClick={() => copiarCodigo(inv.codigo, inv.estado)}
