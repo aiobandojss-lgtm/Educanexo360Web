@@ -28,6 +28,7 @@ import {
   Tooltip,
   Badge,
   Link,
+  FormHelperText,
 } from "@mui/material";
 import {
   Today as TodayIcon,
@@ -40,7 +41,6 @@ import {
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
-  Info as InfoIcon,
   CloudDownload as CloudDownloadIcon,
   PictureAsPdf as PictureAsPdfIcon,
   Description as DescriptionIcon,
@@ -59,16 +59,13 @@ import {
 } from "../../utils/permissionTester";
 import EventoActionButtons from "../../components/calendario/EventoActionButtons";
 import { eventOccursOnDate, formatDate } from "../../utils/dateUtils";
-import TimeZoneDebugger from "../../components/debug/TimeZoneDebugger";
 
-// Función para verificar si un evento ya pasó
 const isEventPassed = (evento: IEvento): boolean => {
   const now = new Date();
   const fechaFin = new Date(evento.fechaFin);
   return fechaFin < now;
 };
 
-// Componente para mostrar los detalles de un evento
 const EventoDetalle = ({
   evento,
   onClose,
@@ -108,11 +105,7 @@ const EventoDetalle = ({
 
     try {
       setDescargando(true);
-
-      // La URL ya está proporcionada por el servicio
       const url = calendarioService.getAdjuntoUrl(evento._id);
-
-      // Abrir en una nueva pestaña (esto manejará la descarga)
       window.open(url, "_blank");
     } catch (error) {
       console.error("Error al descargar el archivo:", error);
@@ -124,7 +117,6 @@ const EventoDetalle = ({
     }
   };
 
-  // Verificar si tiene archivo adjunto
   const tieneArchivoAdjunto =
     evento.archivoAdjunto &&
     evento.archivoAdjunto.nombre &&
@@ -172,7 +164,6 @@ const EventoDetalle = ({
             </Typography>
           </Box>
 
-          {/* Añadir botones de acción para aprobar/cancelar (solo visible para admins/docentes) */}
           {canEdit && (
             <EventoActionButtons
               evento={evento}
@@ -226,7 +217,6 @@ const EventoDetalle = ({
             </Typography>
           </Grid>
 
-          {/* Archivos adjuntos con mejor visualización */}
           {tieneArchivoAdjunto && (
             <Grid item xs={12}>
               <Box
@@ -242,7 +232,6 @@ const EventoDetalle = ({
                 </Typography>
 
                 <Box sx={{ display: "flex", alignItems: "center", mt: 1 }}>
-                  {/* Icono basado en el tipo de archivo */}
                   <Box sx={{ mr: 2 }}>
                     {evento.archivoAdjunto?.tipo?.includes("pdf") ? (
                       <PictureAsPdfIcon color="error" fontSize="large" />
@@ -342,7 +331,7 @@ const EventoDetalle = ({
               onClose();
             }}
           >
-            Eliminar
+            Cancelar
           </Button>
         )}
 
@@ -364,18 +353,12 @@ const CalendarioEscolar = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [filtroTipo, setFiltroTipo] = useState<string>("");
-  const [showDebugger, setShowDebugger] = useState<boolean>(false);
 
-  // MODIFICADO: Inicialización del filtro de estado según rol del usuario (eliminando FINALIZADO)
-  const [filtroEstado, setFiltroEstado] = useState<string>(
-    user?.tipo === "ADMIN" ||
-      user?.tipo === "DOCENTE" ||
-      user?.tipo === "ADMINISTRATIVO" ||
-      user?.tipo === "COORDINADOR" ||
-      user?.tipo === "RECTOR"
-      ? "" // Mostrar TODOS los eventos para roles administrativos
-      : "ACTIVO" // Solo eventos ACTIVOS para estudiantes y acudientes
-  );
+  // 🚨 FILTRO SIMPLE Y CLARO
+  const [filtroEstado, setFiltroEstado] = useState<string>(() => {
+    // TODOS los usuarios por defecto ven solo ACTIVOS
+    return "ACTIVO";
+  });
 
   const [eventosDelDia, setEventosDelDia] = useState<IEvento[]>([]);
   const [diaSeleccionado, setDiaSeleccionado] = useState<number | null>(null);
@@ -386,9 +369,6 @@ const CalendarioEscolar = () => {
   const [eventoSeleccionado, setEventoSeleccionado] = useState<IEvento | null>(
     null
   );
-  const [dialogoConfirmacionAbierto, setDialogoConfirmacionAbierto] =
-    useState<boolean>(false);
-  const [eventoAEliminar, setEventoAEliminar] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
   const months = [
@@ -406,7 +386,7 @@ const CalendarioEscolar = () => {
     "Diciembre",
   ];
 
-  // MODIFICADO: Verificar si el usuario tiene permisos de administración
+  // 🚨 DETERMINAR QUÉ USUARIOS PUEDEN EDITAR EVENTOS
   const canEditEvents =
     user?.tipo === "ADMIN" ||
     user?.tipo === "DOCENTE" ||
@@ -414,150 +394,72 @@ const CalendarioEscolar = () => {
     user?.tipo === "COORDINADOR" ||
     user?.tipo === "RECTOR";
 
-  // Mostrar información del usuario actual para depuración
+  // 🚨 DETERMINAR QUÉ USUARIOS PUEDEN VER FILTROS DE ESTADO
+  const canFilterByState =
+    user?.tipo === "ADMIN" ||
+    user?.tipo === "DOCENTE" ||
+    user?.tipo === "ADMINISTRATIVO" ||
+    user?.tipo === "COORDINADOR" ||
+    user?.tipo === "RECTOR";
+
   useEffect(() => {
     logCurrentUser();
   }, []);
 
-  // MODIFICADO: Cargar eventos del mes actual con manejo adecuado por tipo de usuario
   useEffect(() => {
     const fetchEvents = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        // Crear fechas de inicio y fin para el mes
         const startDate = new Date(year, month, 1);
-        const endDate = new Date(year, month + 1, 0); // Último día del mes
+        const endDate = new Date(year, month + 1, 0);
 
-        // Determinar el filtro de estado según el rol
-        const estadoFiltro =
-          user?.tipo === "ESTUDIANTE" || user?.tipo === "PADRE"
-            ? "ACTIVO" // Estudiantes y padres solo ven eventos ACTIVOS
-            : filtroEstado; // Roles administrativos pueden usar el filtro seleccionado
+        // 🚨 EL FILTRADO AHORA SE MANEJA AUTOMÁTICAMENTE EN EL SERVICIO
+        // 🚨 LÓGICA SIMPLIFICADA - TODOS USAN EL MISMO SERVICIO
+        try {
+          console.log("🔍 Solicitando eventos con estado:", filtroEstado);
 
-        console.log("Consultando eventos con filtros:", {
-          inicio: startDate.toISOString(),
-          fin: endDate.toISOString(),
-          tipo: filtroTipo || "TODOS",
-          estado: estadoFiltro || "TODOS LOS ESTADOS",
-        });
+          const eventos = await calendarioService.obtenerEventos({
+            inicio: startDate.toISOString(),
+            fin: endDate.toISOString(),
+            ...(filtroTipo && { tipo: filtroTipo }),
+            estado: filtroEstado, // Siempre enviar el estado seleccionado
+          });
 
-        // SOLUCIÓN ESPECÍFICA PARA ESTUDIANTES Y PADRES
-        if (user?.tipo === "ESTUDIANTE" || user?.tipo === "PADRE") {
-          try {
-            console.log(
-              "Usuario estudiante/padre detectado, filtrando eventos ACTIVOS..."
-            );
-
-            // Primero intentamos el método normal
+          console.log(`✅ Eventos recibidos: ${eventos.length}`);
+          setEvents(eventos);
+        } catch (normalError) {
+          console.error("Error al obtener eventos:", normalError);
+          // Fallback solo para estudiantes/padres
+          if (
+            user?.tipo === "ESTUDIANTE" ||
+            user?.tipo === "PADRE" ||
+            user?.tipo === "ACUDIENTE"
+          ) {
             try {
-              const eventos = await calendarioService.obtenerEventos({
-                inicio: startDate.toISOString(),
-                fin: endDate.toISOString(),
-                ...(filtroTipo && { tipo: filtroTipo }),
-                estado: "ACTIVO", // FORZAR filtro a ACTIVO para estudiantes/padres
-              });
-
-              setEvents(eventos);
-              console.log(
-                `Eventos cargados para estudiante/padre: ${eventos.length}`
-              );
-            } catch (normalError) {
-              console.error(
-                "Error normal para estudiantes/padres:",
-                normalError
-              );
-
-              // Si falla, intentamos el método directo como solución temporal
-              console.log("Intentando método alternativo...");
               const eventosDirectos = await getCalendarioEventosDirecto();
-
-              // Filtramos manualmente SOLO eventos ACTIVOS
               const eventosFiltrados = eventosDirectos.filter((evento) => {
                 const fechaEvento = new Date(evento.fechaInicio);
                 const enRangoFecha =
                   fechaEvento >= startDate && fechaEvento <= endDate;
                 const coincideTipo = !filtroTipo || evento.tipo === filtroTipo;
-                const estadoActivo = evento.estado === "ACTIVO"; // FORZAR filtro a ACTIVO
-
+                const estadoActivo = evento.estado === "ACTIVO";
                 return enRangoFecha && coincideTipo && estadoActivo;
               });
-
               setEvents(eventosFiltrados);
-              console.log(
-                "Método alternativo: eventos cargados:",
-                eventosFiltrados.length
-              );
+            } catch (fallbackError) {
+              setError("No se pudieron cargar los eventos.");
+              setEvents([]);
             }
-          } catch (studentError) {
-            console.error(
-              "Error al obtener eventos para estudiante/padre:",
-              studentError
-            );
-            setError(
-              "No tienes acceso para ver eventos en este momento. Por favor, contacta al administrador del sistema."
-            );
-            setEvents([]);
-          }
-        } else {
-          // Para roles administrativos, usar el método normal con el filtro seleccionado
-          try {
-            console.log(
-              "Usuario administrativo detectado, usando filtros seleccionados"
-            );
-            const eventos = await calendarioService.obtenerEventos({
-              inicio: startDate.toISOString(),
-              fin: endDate.toISOString(),
-              ...(filtroTipo && { tipo: filtroTipo }),
-              estado: estadoFiltro, // Usar el filtro seleccionado para admin
-            });
-
-            console.log(`Eventos encontrados: ${eventos.length}`);
-
-            // DEPURACIÓN DE EVENTOS
-            if (eventos.length > 0) {
-              console.log("=== DEPURACIÓN DE EVENTOS ===");
-              eventos.slice(0, 3).forEach((evento) => {
-                const fechaInicioLocal = new Date(evento.fechaInicio);
-                const fechaFinLocal = new Date(evento.fechaFin);
-
-                console.log(`Evento: ${evento.titulo}`);
-                console.log(`ID: ${evento._id}`);
-                console.log(`FechaInicio (UTC): ${evento.fechaInicio}`);
-                console.log(
-                  `FechaInicio (Local): ${fechaInicioLocal.toString()}`
-                );
-                console.log(
-                  `Día del mes (getDate): ${fechaInicioLocal.getDate()}`
-                );
-                console.log(`Todo el día: ${evento.todoElDia}`);
-                console.log(`Evento pasado: ${isEventPassed(evento)}`);
-                console.log("------------------------");
-              });
-              console.log("=============================");
-            }
-
-            setEvents(eventos);
-          } catch (err: any) {
-            console.error("Error al obtener eventos:", err);
-
-            if (err.response && err.response.status === 403) {
-              setError(
-                "No tienes permisos para acceder a los eventos del calendario. Por favor contacta al administrador."
-              );
-            } else {
-              setError(
-                "No se pudieron cargar los eventos. Por favor intenta más tarde."
-              );
-            }
-
+          } else {
+            setError("No se pudieron cargar los eventos.");
             setEvents([]);
           }
         }
       } catch (err) {
-        console.error("Error general al cargar eventos:", err);
-        setError("Ocurrió un error inesperado. Por favor intenta más tarde.");
+        console.error("Error al cargar eventos:", err);
+        setError("No se pudieron cargar los eventos.");
         setEvents([]);
       } finally {
         setLoading(false);
@@ -649,102 +551,120 @@ const CalendarioEscolar = () => {
 
   const handleDayClick = (day: number | null) => {
     if (!day) return;
-
     setDiaSeleccionado(day);
-
-    // Filtrar eventos para el día seleccionado con la nueva lógica
     const eventosDelDia = getEventosDelDia(day);
-    console.log(`Eventos para día ${day}:`, eventosDelDia);
-
     setEventosDelDia(eventosDelDia);
     setDialogoEventoAbierto(true);
   };
 
   const handleEditarEvento = (eventoId: string) => {
-    // Solo permitir editar a admins y docentes
-    if (!canEditEvents) return;
-
-    // Navegar a la página de edición del evento
     navigate(`/calendario/editar/${eventoId}`);
   };
 
   const handleVerEvento = (evento: IEvento) => {
     setEventoSeleccionado(evento);
-
-    // Mostrar detalle del evento
     setDetalleEventoAbierto(true);
   };
 
-  const handleEliminarEvento = (eventoId: string) => {
-    // Solo permitir eliminar a admins y docentes
-    if (!canEditEvents) return;
+  // 🚨 FUNCIÓN DE ELIMINACIÓN CON DEBUG COMPLETO
+  const handleEliminarEvento = async (eventoId: string) => {
+    console.log("🚨 === DEBUG CANCELACIÓN COMPLETA ===");
+    console.log("1. Evento ID:", eventoId);
+    console.log("2. Usuario Redux:", user);
+    console.log("3. Puede editar (canEditEvents):", canEditEvents);
+    console.log("4. Estado de eventos actual:", events.length);
 
-    setEventoAEliminar(eventoId);
-    setDialogoConfirmacionAbierto(true);
-  };
+    const confirmacion = window.confirm(
+      "¿Estás seguro de que deseas cancelar este evento?\n\nEl evento será marcado como cancelado."
+    );
 
-  const confirmarEliminarEvento = async () => {
-    if (!eventoAEliminar) return;
+    if (!confirmacion) {
+      console.log("6. ❌ Cancelación cancelada por el usuario");
+      return;
+    }
 
     try {
       setLoading(true);
-      await calendarioService.eliminarEvento(eventoAEliminar);
+      setError(null);
 
-      // Actualizar la lista de eventos
-      setEvents(events.filter((e) => e._id !== eventoAEliminar));
+      console.log("7. 🔄 Iniciando cancelación...");
+      console.log("8. Llamando a calendarioService.eliminarEvento()");
 
-      // Actualizar la lista de eventos del día
-      setEventosDelDia(eventosDelDia.filter((e) => e._id !== eventoAEliminar));
+      const resultado = await calendarioService.eliminarEvento(eventoId);
 
-      setSuccess("Evento eliminado correctamente");
+      console.log("9. ✅ Respuesta del servicio:", resultado);
 
-      // Cerrar diálogos
-      setDialogoConfirmacionAbierto(false);
+      // Actualizar estado local
+      console.log("12. Actualizando estado local...");
 
-      // Si no quedan eventos para el día, cerrar ese diálogo también
-      if (eventosDelDia.length <= 1) {
+      const eventosAnteriores = events.length;
+      setEvents((prevEvents) => {
+        const nuevosEventos = prevEvents.filter((e) => e._id !== eventoId);
+        console.log(
+          `13. Eventos actualizados: ${prevEvents.length} -> ${nuevosEventos.length}`
+        );
+        return nuevosEventos;
+      });
+
+      const eventosDelDiaAnteriores = eventosDelDia.length;
+      setEventosDelDia((prevEventos) => {
+        const nuevosEventos = prevEventos.filter((e) => e._id !== eventoId);
+        console.log(
+          `14. Eventos del día actualizados: ${prevEventos.length} -> ${nuevosEventos.length}`
+        );
+        return nuevosEventos;
+      });
+
+      console.log("15. ✅ Estados actualizados correctamente");
+
+      setSuccess("✅ Evento cancelado exitosamente");
+
+      // Cerrar diálogos si no quedan eventos
+      const eventosRestantes = eventosDelDia.filter((e) => e._id !== eventoId);
+      if (eventosRestantes.length === 0) {
+        console.log("16. Cerrando diálogo - no quedan eventos");
         setDialogoEventoAbierto(false);
       }
 
-      // Limpiar mensaje de éxito después de unos segundos
-      setTimeout(() => {
-        setSuccess(null);
-      }, 3000);
-    } catch (err) {
-      console.error("Error al eliminar evento:", err);
-      setError("No se pudo eliminar el evento. Intente nuevamente más tarde.");
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err: any) {
+      console.error("❌ === ERROR COMPLETO EN CANCELACIÓN ===");
+      console.error("Error objeto completo:", err);
+
+      if (err.response) {
+        if (err.response.status === 401) {
+          setError("❌ Error de autenticación - Inicia sesión nuevamente");
+        } else if (err.response.status === 403) {
+          setError("❌ Sin permisos para cancelar este evento");
+        } else if (err.response.status === 404) {
+          setError("❌ El evento no existe o ya fue cancelado");
+        } else {
+          setError(
+            `❌ Error del servidor (${err.response.status}): ${
+              err.response.data?.message || "Error desconocido"
+            }`
+          );
+        }
+      } else if (err.request) {
+        setError("❌ Error de conexión - Verifica tu internet");
+      } else {
+        setError(`❌ Error inesperado: ${err.message}`);
+      }
     } finally {
       setLoading(false);
+      console.log("=== FIN DEBUG CANCELACIÓN ===");
     }
   };
 
-  // Manejar cambio de estado de un evento
   const handleStateChange = () => {
-    // Recargar eventos
     setSuccess("Estado del evento actualizado correctamente");
-
-    // El estado success en el efecto provocará una recarga de eventos
-    setTimeout(() => {
-      setSuccess(null);
-    }, 3000);
-
-    // Cerrar diálogos si están abiertos
-    if (detalleEventoAbierto) {
-      setDetalleEventoAbierto(false);
-    }
-
-    if (dialogoEventoAbierto) {
-      setDialogoEventoAbierto(false);
-    }
+    setTimeout(() => setSuccess(null), 3000);
+    if (detalleEventoAbierto) setDetalleEventoAbierto(false);
+    if (dialogoEventoAbierto) setDialogoEventoAbierto(false);
   };
 
   const handleCrearEvento = () => {
-    // Solo permitir crear a admins y docentes
-    if (!canEditEvents) return;
-
-    // Si hay un día seleccionado, guardarlo en sessionStorage para usarlo en el formulario
     if (diaSeleccionado) {
-      // Usar una hora fija del mediodía para evitar cualquier problema de zona horaria
       const fechaSeleccionada = new Date(
         year,
         month,
@@ -753,39 +673,30 @@ const CalendarioEscolar = () => {
         0,
         0
       );
-
-      // Guardar en formato ISO para consistencia
       sessionStorage.setItem(
         "nuevaFechaEvento",
         fechaSeleccionada.toISOString()
       );
     }
-
     navigate("/calendario/nuevo");
   };
 
-  // Crear calendario del mes actual
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstDayOfMonth = new Date(year, month, 1).getDay();
 
   const calendarDays = [];
   let day = 1;
 
-  // Cabecera de días de la semana
   const weekDays = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
-  // Generar filas del calendario
   for (let i = 0; i < 6; i++) {
     const row = [];
     for (let j = 0; j < 7; j++) {
       if (i === 0 && j < firstDayOfMonth) {
-        // Días anteriores al mes actual
         row.push(null);
       } else if (day > daysInMonth) {
-        // Días posteriores al mes actual
         row.push(null);
       } else {
-        // Días del mes actual
         row.push(day);
         day++;
       }
@@ -794,16 +705,11 @@ const CalendarioEscolar = () => {
     if (day > daysInMonth) break;
   }
 
-  // Función mejorada para obtener eventos de un día específico
   const getEventosDelDia = (day: number | null) => {
     if (!day) return [];
-
-    // Crear un objeto Date para representar el día seleccionado
     const fechaDia = new Date(year, month, day);
-
     return events.filter((evento) => {
       try {
-        // Usar la utilidad para determinar si el evento ocurre en esta fecha
         return eventOccursOnDate(
           evento.fechaInicio,
           evento.fechaFin,
@@ -817,37 +723,24 @@ const CalendarioEscolar = () => {
     });
   };
 
-  // Función para verificar si un día tiene eventos
-  const dayHasEvents = (day: number | null) => {
-    if (!day) return false;
-    return getEventosDelDia(day).length > 0;
-  };
-
-  // Función para obtener un resumen de tipos de eventos para un día
   const getEventTypesForDay = (day: number | null) => {
     if (!day) return [];
-
     const eventosDelDia = getEventosDelDia(day);
-
-    // Usar un enfoque alternativo para obtener valores únicos sin spread + Set
     const tiposMap: { [key: string]: boolean } = {};
     eventosDelDia.forEach((evento) => {
       tiposMap[evento.tipo] = true;
     });
-
-    // Convertir las claves del objeto a un array
     return Object.keys(tiposMap) as Array<
       "ACADEMICO" | "INSTITUCIONAL" | "CULTURAL" | "DEPORTIVO" | "OTRO"
     >;
   };
 
-  // Obtener eventos próximos (ordenados por fecha)
   const proximosEventos = [...events]
     .sort(
       (a, b) =>
         new Date(a.fechaInicio).getTime() - new Date(b.fechaInicio).getTime()
     )
-    .slice(0, 5); // Mostrar solo los primeros 5
+    .slice(0, 5);
 
   return (
     <Box>
@@ -863,7 +756,6 @@ const CalendarioEscolar = () => {
           Calendario Escolar
         </Typography>
 
-        {/* Solo mostrar botón de crear si el usuario tiene permisos */}
         {canEditEvents && (
           <Button
             variant="contained"
@@ -886,14 +778,6 @@ const CalendarioEscolar = () => {
         <Alert severity="success" sx={{ mb: 3, borderRadius: 2 }}>
           {success}
         </Alert>
-      )}
-
-      {/* Depurador temporal - quitar en producción */}
-      {showDebugger && (
-        <TimeZoneDebugger
-          eventos={events}
-          onClose={() => setShowDebugger(false)}
-        />
       )}
 
       <Grid container spacing={3}>
@@ -925,15 +809,18 @@ const CalendarioEscolar = () => {
               </IconButton>
             </Box>
 
-            {/* Filtros para eventos */}
+            {/* 🚨 FILTROS ADAPTADOS AL TIPO DE USUARIO */}
             <Box
               sx={{
                 mb: 2,
                 display: "flex",
                 justifyContent: "flex-end",
                 gap: 2,
+                flexWrap: "wrap",
+                alignItems: "center",
               }}
             >
+              {/* Filtro por tipo - disponible para todos */}
               <FormControl size="small" sx={{ width: 200 }}>
                 <InputLabel id="filtro-tipo-label">Filtrar por tipo</InputLabel>
                 <Select
@@ -952,12 +839,8 @@ const CalendarioEscolar = () => {
                 </Select>
               </FormControl>
 
-              {/* MODIFICADO: Mostrar filtro de estado solo para usuarios administrativos */}
-              {(user?.tipo === "ADMIN" ||
-                user?.tipo === "DOCENTE" ||
-                user?.tipo === "ADMINISTRATIVO" ||
-                user?.tipo === "COORDINADOR" ||
-                user?.tipo === "RECTOR") && (
+              {/* 🚨 Filtro por estado - SOLO 3 OPCIONES QUE FUNCIONAN */}
+              {canFilterByState && (
                 <FormControl size="small" sx={{ width: 200 }}>
                   <InputLabel id="filtro-estado-label">Estado</InputLabel>
                   <Select
@@ -967,13 +850,21 @@ const CalendarioEscolar = () => {
                     label="Estado"
                     onChange={(e) => setFiltroEstado(e.target.value)}
                   >
-                    <MenuItem value="">Todos los estados</MenuItem>
                     <MenuItem value="ACTIVO">Activos</MenuItem>
                     <MenuItem value="PENDIENTE">Pendientes</MenuItem>
-                    {/* Eliminado FINALIZADO del selector */}
                     <MenuItem value="CANCELADO">Cancelados</MenuItem>
                   </Select>
                 </FormControl>
+              )}
+
+              {/* 🚨 Información para estudiantes/padres */}
+              {!canFilterByState && (
+                <Chip
+                  label="Solo eventos activos"
+                  color="success"
+                  size="small"
+                  sx={{ borderRadius: "16px" }}
+                />
               )}
             </Box>
 
@@ -989,7 +880,6 @@ const CalendarioEscolar = () => {
                   gap: 1,
                 }}
               >
-                {/* Cabecera de días de la semana */}
                 {weekDays.map((day, index) => (
                   <Box
                     key={index}
@@ -1004,7 +894,6 @@ const CalendarioEscolar = () => {
                   </Box>
                 ))}
 
-                {/* Días del calendario */}
                 {calendarDays.flat().map((day, index) => {
                   const tiposEventos = getEventTypesForDay(day);
                   const eventosDelDia = getEventosDelDia(day);
@@ -1018,7 +907,7 @@ const CalendarioEscolar = () => {
                       sx={{
                         textAlign: "center",
                         p: 1,
-                        pb: 2, // Espacio para marcas de eventos
+                        pb: 2,
                         minHeight: 60,
                         bgcolor: day ? "background.paper" : "transparent",
                         border: day ? "1px solid #e0e0e0" : "none",
@@ -1030,7 +919,6 @@ const CalendarioEscolar = () => {
                               cursor: "pointer",
                             }
                           : {},
-                        // Destacar el día actual
                         ...(day === new Date().getDate() &&
                         month === new Date().getMonth() &&
                         year === new Date().getFullYear()
@@ -1060,19 +948,6 @@ const CalendarioEscolar = () => {
                         </Badge>
                       )}
 
-                      {day && cantidadEventos > 0 && (
-                        <Box sx={{ position: "absolute", top: 0, right: 0 }}>
-                          <Typography
-                            variant="caption"
-                            color="primary"
-                            fontWeight="bold"
-                          >
-                            {cantidadEventos}
-                          </Typography>
-                        </Box>
-                      )}
-
-                      {/* Indicador de eventos pasados */}
                       {day && hasPastEvents && (
                         <Box
                           sx={{
@@ -1087,7 +962,6 @@ const CalendarioEscolar = () => {
                         />
                       )}
 
-                      {/* Indicadores de eventos más vistosos */}
                       {day && tiposEventos.length > 0 && (
                         <Box
                           sx={{
@@ -1158,7 +1032,6 @@ const CalendarioEscolar = () => {
                             bgcolor: "rgba(93, 169, 233, 0.05)",
                             cursor: "pointer",
                           },
-                          // Estilo visual para eventos pasados
                           ...(isPassed && {
                             opacity: 0.7,
                             color: "text.secondary",
@@ -1218,7 +1091,6 @@ const CalendarioEscolar = () => {
                           }
                         />
 
-                        {/* Botones de acciones rápidas para admins y docentes */}
                         {canEditEvents && (
                           <Box>
                             <Tooltip title="Editar">
@@ -1243,7 +1115,6 @@ const CalendarioEscolar = () => {
             )}
           </Paper>
 
-          {/* Sección de estadísticas de eventos */}
           <Paper
             elevation={0}
             sx={{
@@ -1270,7 +1141,6 @@ const CalendarioEscolar = () => {
                   </CardContent>
                 </Card>
 
-                {/* Agregar estadística de eventos pasados */}
                 <Card variant="outlined" sx={{ mb: 2, borderRadius: 2 }}>
                   <CardContent
                     sx={{ display: "flex", justifyContent: "space-between" }}
@@ -1331,26 +1201,12 @@ const CalendarioEscolar = () => {
                     </Box>
                   );
                 })}
-
-                {/* Botón de depuración - Solo visible en desarrollo */}
-                <Box sx={{ mt: 3, display: "flex", justifyContent: "center" }}>
-                  <Button
-                    variant="text"
-                    size="small"
-                    color="inherit"
-                    sx={{ fontSize: "0.75rem", opacity: 0.6 }}
-                    onClick={() => setShowDebugger(!showDebugger)}
-                  >
-                    {showDebugger ? "Ocultar depurador" : "Mostrar depurador"}
-                  </Button>
-                </Box>
               </>
             )}
           </Paper>
         </Grid>
       </Grid>
 
-      {/* Diálogo para mostrar eventos de un día específico */}
       <Dialog
         open={dialogoEventoAbierto}
         onClose={() => setDialogoEventoAbierto(false)}
@@ -1379,11 +1235,8 @@ const CalendarioEscolar = () => {
                       cursor: "pointer",
                       py: 2,
                       ...(eventoSeleccionado?._id === evento._id
-                        ? {
-                            bgcolor: "rgba(93, 169, 233, 0.1)",
-                          }
+                        ? { bgcolor: "rgba(93, 169, 233, 0.1)" }
                         : {}),
-                      // Estilo visual para eventos pasados
                       ...(isPassed && {
                         opacity: 0.7,
                         color: "text.secondary",
@@ -1429,7 +1282,10 @@ const CalendarioEscolar = () => {
                                 {" - "}
                                 {new Date(evento.fechaFin).toLocaleTimeString(
                                   [],
-                                  { hour: "2-digit", minute: "2-digit" }
+                                  {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  }
                                 )}
                               </>
                             )}
@@ -1461,7 +1317,6 @@ const CalendarioEscolar = () => {
                             )}
                           </Box>
 
-                          {/* Mostrar si hay archivo adjunto */}
                           {evento.archivoAdjunto &&
                             evento.archivoAdjunto.nombre && (
                               <Box mt={1} display="flex" alignItems="center">
@@ -1475,7 +1330,7 @@ const CalendarioEscolar = () => {
                                       evento._id
                                     )}
                                     target="_blank"
-                                    onClick={(e) => e.stopPropagation()} // Evitar que se cierre el diálogo
+                                    onClick={(e) => e.stopPropagation()}
                                   >
                                     {evento.archivoAdjunto.nombre}
                                   </Link>
@@ -1486,7 +1341,6 @@ const CalendarioEscolar = () => {
                       }
                     />
 
-                    {/* Botones de acción para admins y docentes */}
                     {canEditEvents && (
                       <Box sx={{ display: "flex" }}>
                         <Tooltip title="Editar evento">
@@ -1497,18 +1351,24 @@ const CalendarioEscolar = () => {
                               handleEditarEvento(evento._id);
                             }}
                             color="primary"
+                            disabled={loading}
                           >
                             <EditIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
-                        <Tooltip title="Eliminar evento">
+                        <Tooltip title="Cancelar evento">
                           <IconButton
                             size="small"
                             onClick={(e) => {
                               e.stopPropagation();
+                              console.log(
+                                "🚨 Click cancelar evento desde lista:",
+                                evento._id
+                              );
                               handleEliminarEvento(evento._id);
                             }}
                             color="error"
+                            disabled={loading}
                           >
                             <DeleteIcon fontSize="small" />
                           </IconButton>
@@ -1522,7 +1382,6 @@ const CalendarioEscolar = () => {
           )}
         </DialogContent>
         <DialogActions>
-          {/* Botón para crear evento en este día específico (solo para admins y docentes) */}
           {canEditEvents && (
             <Button
               color="primary"
@@ -1544,7 +1403,6 @@ const CalendarioEscolar = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Diálogo de detalle de evento */}
       <Dialog
         open={detalleEventoAbierto}
         onClose={() => setDetalleEventoAbierto(false)}
@@ -1561,36 +1419,6 @@ const CalendarioEscolar = () => {
             canEdit={canEditEvents}
           />
         )}
-      </Dialog>
-
-      {/* Diálogo de confirmación para eliminar evento */}
-      <Dialog
-        open={dialogoConfirmacionAbierto}
-        onClose={() => setDialogoConfirmacionAbierto(false)}
-      >
-        <DialogTitle>Confirmar eliminación</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            ¿Está seguro de que desea eliminar este evento? Esta acción no se
-            puede deshacer.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => setDialogoConfirmacionAbierto(false)}
-            color="primary"
-          >
-            Cancelar
-          </Button>
-          <Button
-            onClick={confirmarEliminarEvento}
-            color="error"
-            autoFocus
-            disabled={loading}
-          >
-            {loading ? "Eliminando..." : "Eliminar"}
-          </Button>
-        </DialogActions>
       </Dialog>
     </Box>
   );

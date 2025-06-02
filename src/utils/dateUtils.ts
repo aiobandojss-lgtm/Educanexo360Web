@@ -138,3 +138,76 @@ export const debugDate = (label: string, date: Date | string) => {
   console.log("getTimezoneOffset():", date.getTimezoneOffset());
   console.groupEnd();
 };
+
+// === NUEVAS FUNCIONES AGREGADAS ===
+
+/**
+ * Crear fecha en zona horaria local (Colombia)
+ * Útil para crear eventos en la fecha correcta
+ */
+export const createLocalDate = (
+  year: number,
+  month: number,
+  day: number,
+  hours = 12,
+  minutes = 0
+): Date => {
+  const fecha = new Date(year, month, day, hours, minutes, 0);
+  debugDate("Fecha creada local", fecha);
+  return fecha;
+};
+
+/**
+ * Formatear fecha para input type="date"
+ */
+export const formatDateForInput = (date: Date): string => {
+  if (!date || isNaN(date.getTime())) {
+    console.warn("Fecha inválida:", date);
+    return "";
+  }
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
+/**
+ * Formatear hora para input type="time"
+ */
+export const formatTimeForInput = (date: Date): string => {
+  if (!date || isNaN(date.getTime())) {
+    return "12:00";
+  }
+
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+
+  return `${hours}:${minutes}`;
+};
+
+/**
+ * Crear fecha de evento manteniendo zona horaria local
+ */
+export const createEventDate = (
+  dateString: string,
+  timeString: string = "12:00",
+  isAllDay: boolean = false
+): Date => {
+  const [year, month, day] = dateString.split("-").map(Number);
+  const [hours, minutes] = timeString.split(":").map(Number);
+
+  const finalHours = isAllDay ? 12 : hours;
+  const finalMinutes = isAllDay ? 0 : minutes;
+
+  const fecha = new Date(year, month - 1, day, finalHours, finalMinutes, 0);
+
+  console.log("=== CREAR FECHA EVENTO ===");
+  console.log("Input:", { dateString, timeString, isAllDay });
+  console.log("Resultado:", fecha.toString());
+  console.log("ISO:", fecha.toISOString());
+  console.log("===========================");
+
+  return fecha;
+};

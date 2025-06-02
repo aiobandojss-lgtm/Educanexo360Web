@@ -33,7 +33,7 @@ export interface IEvento {
 
 class CalendarioService {
   /**
-   * Obtiene eventos del calendario con filtros opcionales y manejo correcto de permisos
+   * 🚨 FUNCIÓN PRINCIPAL MODIFICADA - Obtiene eventos con filtrado automático por tipo de usuario
    */
   async obtenerEventos(filtros?: {
     inicio?: string;
@@ -43,27 +43,55 @@ class CalendarioService {
     estado?: string;
   }): Promise<IEvento[]> {
     try {
-      // Verificar el tipo de usuario para aplicar filtros de seguridad
+      // Verificar el tipo de usuario para aplicar restricciones de seguridad
       const state = store.getState();
       const userRole = state?.auth?.user?.tipo;
 
-      // Para estudiantes y padres, forzar siempre el filtro a ACTIVO por seguridad
-      let filtrosAplicados = { ...filtros };
-      if (userRole === "ESTUDIANTE" || userRole === "PADRE") {
-        filtrosAplicados.estado = "ACTIVO";
-        console.log(
-          "Usuario estudiante/padre detectado - Forzando filtro a eventos ACTIVOS"
-        );
-      }
+      console.log(
+        "🔍 Obteniendo eventos - Usuario:",
+        userRole,
+        "Estado solicitado:",
+        filtros?.estado
+      );
 
-      console.log("Obteniendo eventos con filtros:", filtrosAplicados);
+      // 🚨 LÓGICA SIMPLIFICADA
+      let filtrosAplicados = { ...filtros };
+
+      if (
+        userRole === "ESTUDIANTE" ||
+        userRole === "PADRE" ||
+        userRole === "ACUDIENTE"
+      ) {
+        // Estudiantes, padres y acudientes SOLO pueden ver eventos ACTIVOS
+        filtrosAplicados.estado = "ACTIVO";
+        console.log("✅ Usuario estudiante/padre/acudiente - Forzando ACTIVO");
+      }
+      // Admin/Docentes: enviar el estado tal como viene (ACTIVO, PENDIENTE, CANCELADO)
+
+      console.log("🔍 Filtros aplicados finales:", filtrosAplicados);
 
       const response = await axiosInstance.get(API_ROUTES.CALENDARIO.BASE, {
         params: filtrosAplicados,
       });
 
-      console.log(`Eventos obtenidos: ${response.data.data?.length || 0}`);
-      return response.data.data;
+      const eventos = response.data.data || [];
+      console.log(`✅ Eventos obtenidos: ${eventos.length}`);
+
+      // Log de estados para verificar filtrado
+      if (eventos.length > 0) {
+        const estadosSummary = eventos.reduce((acc: any, evento: IEvento) => {
+          acc[evento.estado] = (acc[evento.estado] || 0) + 1;
+          return acc;
+        }, {});
+        console.log("✅ Estados de eventos obtenidos:", estadosSummary);
+      } else {
+        console.log(
+          "⚠️ No se obtuvieron eventos - Verificar filtros:",
+          filtrosAplicados
+        );
+      }
+
+      return eventos;
     } catch (error: any) {
       if (error.response && error.response.status === 403) {
         throw new Error(
@@ -77,7 +105,7 @@ class CalendarioService {
         );
       }
 
-      console.error("Error al obtener eventos:", error);
+      console.error("❌ Error al obtener eventos:", error);
       throw error;
     }
   }
@@ -105,10 +133,24 @@ class CalendarioService {
    */
   async crearEvento(eventoData: any, archivo?: File): Promise<IEvento> {
     try {
-      // CAMBIO CLAVE: Usar JSON en lugar de FormData
-      // Esto significa que temporalmente no podemos manejar archivos adjuntos
+      // Validar datos básicos
+      if (!eventoData.titulo?.trim()) {
+        throw new Error("El título del evento es obligatorio");
+      }
 
-      // Crear un objeto JSON simple con los datos
+      if (!eventoData.descripcion?.trim()) {
+        throw new Error("La descripción del evento es obligatoria");
+      }
+
+      if (!eventoData.fechaInicio) {
+        throw new Error("La fecha de inicio es obligatoria");
+      }
+
+      if (!eventoData.fechaFin) {
+        throw new Error("La fecha de fin es obligatoria");
+      }
+
+      // Crear objeto limpio con los datos
       const datosEvento = {
         titulo: String(eventoData.titulo || "").trim(),
         descripcion: String(eventoData.descripcion || "").trim(),
@@ -122,7 +164,7 @@ class CalendarioService {
       };
 
       console.log(
-        "Enviando datos como JSON:",
+        "📅 Creando evento - Datos finales:",
         JSON.stringify(datosEvento, null, 2)
       );
 
@@ -137,23 +179,24 @@ class CalendarioService {
         }
       );
 
-      // Si hay archivo y la creación inicial fue exitosa, podríamos
-      // implementar una segunda llamada para adjuntar el archivo
-      // (esto dependerá de si el backend lo soporta)
+      console.log("✅ Evento creado exitosamente:", response.data.data);
 
       return response.data.data;
     } catch (error: any) {
-      console.error("Error al crear evento:", error);
+      console.error("❌ Error al crear evento:", error);
 
-      if (
-        error.response &&
-        error.response.data &&
-        error.response.data.message
-      ) {
+      // Manejo mejorado de errores
+      if (error.response?.data?.message) {
         throw new Error(error.response.data.message);
+      } else if (error.response?.status === 401) {
+        throw new Error("Debes estar autenticado para crear eventos");
+      } else if (error.response?.status === 403) {
+        throw new Error("No tienes permisos para crear eventos");
+      } else if (error.message) {
+        throw new Error(error.message);
+      } else {
+        throw new Error("Error desconocido al crear el evento");
       }
-
-      throw error;
     }
   }
 
@@ -166,7 +209,12 @@ class CalendarioService {
     archivo?: File
   ): Promise<IEvento> {
     try {
-      // CAMBIO CLAVE: Usar JSON en lugar de FormData
+      // Validar ID
+      if (!id) {
+        throw new Error("ID del evento es requerido para actualizar");
+      }
+
+      // Crear objeto limpio con los datos
       const datosEvento = {
         titulo: String(eventoData.titulo || "").trim(),
         descripcion: String(eventoData.descripcion || "").trim(),
@@ -179,6 +227,11 @@ class CalendarioService {
         color: eventoData.color || "#3788d8",
       };
 
+      console.log(
+        "📅 Actualizando evento - Datos finales:",
+        JSON.stringify(datosEvento, null, 2)
+      );
+
       // Enviar como JSON
       const response = await axiosInstance.put(
         `${API_ROUTES.CALENDARIO.BASE}/${id}`,
@@ -190,36 +243,58 @@ class CalendarioService {
         }
       );
 
+      console.log("✅ Evento actualizado exitosamente:", response.data.data);
+
       return response.data.data;
     } catch (error: any) {
-      console.error("Error al actualizar evento:", error);
+      console.error("❌ Error al actualizar evento:", error);
 
-      if (
-        error.response &&
-        error.response.data &&
-        error.response.data.message
-      ) {
+      if (error.response?.data?.message) {
         throw new Error(error.response.data.message);
+      } else if (error.response?.status === 401) {
+        throw new Error("Debes estar autenticado para actualizar eventos");
+      } else if (error.response?.status === 403) {
+        throw new Error("No tienes permisos para actualizar este evento");
+      } else if (error.response?.status === 404) {
+        throw new Error("El evento que intentas actualizar no existe");
+      } else if (error.message) {
+        throw new Error(error.message);
+      } else {
+        throw new Error("Error desconocido al actualizar el evento");
       }
-
-      throw error;
     }
   }
 
   /**
-   * Elimina (cancela) un evento
+   * 🚨 FUNCIÓN MODIFICADA - Elimina (cancela) un evento
    */
   async eliminarEvento(
     id: string
   ): Promise<{ success: boolean; message: string }> {
     try {
+      // Validar ID
+      if (!id) {
+        throw new Error("ID del evento es requerido para eliminar");
+      }
+
+      console.log(`🗑️ Cancelando evento con ID: ${id}`);
+
       const response = await axiosInstance.delete(
         `${API_ROUTES.CALENDARIO.BASE}/${id}`
       );
+
+      console.log("✅ Evento cancelado exitosamente:", response.data);
+
       return response.data;
     } catch (error: any) {
+      console.error("❌ Error al cancelar evento:", error);
+
       if (error.response && error.response.status === 403) {
         throw new Error("No tienes permisos para eliminar este evento");
+      }
+
+      if (error.response && error.response.status === 401) {
+        throw new Error("Debes estar autenticado para eliminar eventos");
       }
 
       if (error.response && error.response.status === 404) {
@@ -228,7 +303,11 @@ class CalendarioService {
         );
       }
 
-      throw error;
+      if (error.response?.data?.message) {
+        throw new Error(error.response.data.message);
+      }
+
+      throw new Error("Error desconocido al eliminar el evento");
     }
   }
 
@@ -262,15 +341,14 @@ class CalendarioService {
 
   /**
    * Cambia el estado de un evento (PENDIENTE, ACTIVO, FINALIZADO, CANCELADO)
-   * @param id ID del evento
-   * @param estado Nuevo estado del evento
-   * @returns Evento actualizado
    */
   async cambiarEstadoEvento(
     id: string,
     estado: "PENDIENTE" | "ACTIVO" | "FINALIZADO" | "CANCELADO"
   ): Promise<IEvento> {
     try {
+      console.log(`🔄 Cambiando estado del evento ${id} a: ${estado}`);
+
       const response = await axiosInstance.patch(
         `${API_ROUTES.CALENDARIO.BASE}/${id}/estado`,
         { estado },
@@ -281,9 +359,11 @@ class CalendarioService {
         }
       );
 
+      console.log("✅ Estado cambiado exitosamente:", response.data.data);
+
       return response.data.data;
     } catch (error: any) {
-      console.error("Error al cambiar el estado del evento:", error);
+      console.error("❌ Error al cambiar el estado del evento:", error);
 
       if (error.response && error.response.status === 403) {
         throw new Error(
@@ -295,11 +375,7 @@ class CalendarioService {
         throw new Error("El evento no existe o ha sido eliminado");
       }
 
-      if (
-        error.response &&
-        error.response.data &&
-        error.response.data.message
-      ) {
+      if (error.response?.data?.message) {
         throw new Error(error.response.data.message);
       }
 
@@ -317,7 +393,6 @@ class CalendarioService {
     return this.obtenerEventos({
       inicio: inicio.toISOString(),
       fin: fin.toISOString(),
-      estado: "ACTIVO",
     });
   }
 
