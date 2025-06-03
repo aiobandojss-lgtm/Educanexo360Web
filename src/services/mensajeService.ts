@@ -441,19 +441,117 @@ const guardarBorrador = async (
     console.log("Destinatarios antes de enviar:", borrador.destinatarios);
     console.log("Longitud destinatarios:", borrador.destinatarios.length);
 
-    const formData = new FormData();
-
-    // Al agregar destinatarios al FormData:
-    if (borrador.destinatarios && Array.isArray(borrador.destinatarios)) {
-      borrador.destinatarios.forEach((dest, index) => {
-        console.log(`Agregando destinatario ${index}: ${dest}`);
-        formData.append("destinatarios", dest);
-      });
+    // Validaciones previas en el frontend
+    if (!borrador.asunto || borrador.asunto.trim() === "") {
+      throw new Error("El asunto es requerido");
     }
 
-    // ... resto sin cambios
-  } catch (error) {
-    console.error("Error en guardarBorrador frontend:", error);
+    if (!borrador.contenido || borrador.contenido.trim() === "") {
+      throw new Error("El contenido es requerido");
+    }
+
+    // Determinar si es creación o actualización
+    const isUpdate = borrador._id ? true : false;
+    const endpoint = isUpdate
+      ? `/mensajes/borradores/${borrador._id}`
+      : "/mensajes/borradores";
+
+    // Limpiar destinatarios (filtrar vacíos o inválidos)
+    const destinatariosLimpios = borrador.destinatarios.filter(
+      (dest) => dest && dest.trim() !== ""
+    );
+
+    console.log("Destinatarios limpios:", destinatariosLimpios);
+
+    // Validar prioridad
+    const prioridadesValidas = ["ALTA", "NORMAL", "BAJA"];
+    const prioridadFinal = prioridadesValidas.includes(borrador.prioridad)
+      ? borrador.prioridad
+      : "NORMAL";
+
+    // Si no hay adjuntos, usar JSON
+    if (adjuntos.length === 0) {
+      const datosLimpios = {
+        ...borrador,
+        destinatarios: destinatariosLimpios,
+        prioridad: prioridadFinal,
+        tipo:
+          borrador.tipo ||
+          (borrador.cursoId ? TipoMensaje.GRUPAL : TipoMensaje.BORRADOR),
+      };
+
+      console.log("Enviando datos JSON:", datosLimpios);
+      logRequest("POST", endpoint, datosLimpios);
+      const response = await axiosInstance.post(endpoint, datosLimpios);
+      return response.data; // ← AGREGAR RETURN
+    }
+
+    // Con adjuntos, usar FormData
+    const formData = new FormData();
+
+    // Agregar todos los campos del borrador de forma segura
+    Object.entries(borrador).forEach(([key, value]) => {
+      if (key === "_id" && !value) return;
+
+      if (key === "destinatarios" && Array.isArray(value)) {
+        // Solo agregar destinatarios válidos
+        destinatariosLimpios.forEach((dest, index) => {
+          if (dest && dest.trim() !== "") {
+            console.log(`Agregando destinatario ${index}: ${dest}`);
+            formData.append("destinatarios", dest);
+          }
+        });
+      } else if (value !== undefined && value !== null && value !== "") {
+        formData.append(key, String(value));
+      }
+    });
+
+    // Asegurar prioridad válida
+    formData.append("prioridad", prioridadFinal);
+
+    // Establecer tipo si no está definido
+    if (!borrador.tipo) {
+      formData.append(
+        "tipo",
+        borrador.cursoId ? TipoMensaje.GRUPAL : TipoMensaje.BORRADOR
+      );
+    }
+
+    // Agregar adjuntos
+    adjuntos.forEach((file, index) => {
+      if (file instanceof File) {
+        console.log(`Agregando adjunto ${index}: ${file.name}`);
+        formData.append("adjuntos", file);
+      }
+    });
+
+    console.log("Enviando FormData con adjuntos...");
+    logRequest("POST", endpoint, { formData: "FormData object (not shown)" });
+    const response = await axiosFileInstance.post(endpoint, formData);
+    return response.data; // ← AGREGAR RETURN
+  } catch (error: any) {
+    console.error("[Frontend] Error guardando borrador:", error);
+
+    // Mejorar manejo de errores específicos
+    if (error.response) {
+      const status = error.response.status;
+      const data = error.response.data;
+
+      if (status === 400) {
+        throw new Error(
+          data.message || "Error de validación en los datos del borrador"
+        );
+      } else if (status === 403) {
+        throw new Error("No tiene permisos para guardar borradores");
+      } else if (status === 404) {
+        throw new Error("El borrador que intenta actualizar no fue encontrado");
+      } else if (status === 500) {
+        throw new Error(
+          "Error interno del servidor. Por favor intente nuevamente"
+        );
+      }
+    }
+
     throw error;
   }
 };
