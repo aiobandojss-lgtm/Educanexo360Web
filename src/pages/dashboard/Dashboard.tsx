@@ -1,4 +1,4 @@
-// src/pages/dashboard/Dashboard.tsx - DASHBOARD MINIMALISTA
+// src/pages/dashboard/Dashboard.tsx - DASHBOARD MINIMALISTA CORREGIDO
 import React, { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import {
@@ -9,7 +9,6 @@ import {
   Card,
   CardContent,
   Button,
-  Chip,
 } from "@mui/material";
 import {
   Email,
@@ -55,21 +54,6 @@ const Dashboard = () => {
     );
   }
 
-  // Función para obtener rol en español
-  const getRolDisplay = (tipo: string) => {
-    const roles: Record<string, string> = {
-      ADMIN: "Administrador",
-      DOCENTE: "Docente",
-      ESTUDIANTE: "Estudiante",
-      PADRE: "Padre de Familia",
-      ACUDIENTE: "Acudiente",
-      RECTOR: "Rector",
-      COORDINADOR: "Coordinador",
-      ADMINISTRATIVO: "Administrativo",
-    };
-    return roles[tipo] || tipo;
-  };
-
   return (
     <Box sx={{ padding: 3 }}>
       {/* Header Institucional */}
@@ -89,9 +73,7 @@ const Dashboard = () => {
           <School sx={{ mr: 2, fontSize: 40, color: "primary.main" }} />
           <Box>
             <Typography variant="h4" color="primary.main" fontWeight="bold">
-              {user?.escuelaId
-                ? `Escuela ID: ${user.escuelaId}`
-                : "Mi Institución Educativa"}
+              Mi Institución Educativa
             </Typography>
             <Typography variant="subtitle1" color="text.secondary">
               Sistema de Comunicación Escolar
@@ -99,17 +81,11 @@ const Dashboard = () => {
           </Box>
         </Box>
 
-        {/* Lado Derecho - Usuario */}
+        {/* Lado Derecho - Usuario (SIN ROL) */}
         <Box sx={{ textAlign: "right" }}>
-          <Typography variant="h5" color="text.primary" gutterBottom>
+          <Typography variant="h5" color="text.primary">
             Bienvenido, {user?.nombre} {user?.apellidos}
           </Typography>
-          <Chip
-            label={getRolDisplay(user?.tipo || "")}
-            color="primary"
-            variant="outlined"
-            size="medium"
-          />
         </Box>
       </Box>
 
@@ -124,16 +100,15 @@ const Dashboard = () => {
         Dashboard
       </Typography>
 
-      {/* Tarjetas Esenciales - Solo 3 */}
+      {/* Tarjetas Esenciales - Solo 3 (ALTURA AJUSTADA) */}
       <Grid container spacing={4} justifyContent="center" sx={{ mb: 6 }}>
         {/* Mensajes sin leer */}
         <Grid item xs={12} sm={6} md={4}>
           <Card
             sx={{
-              height: "200px",
+              minHeight: "180px",
               display: "flex",
               flexDirection: "column",
-              justifyContent: "center",
               bgcolor: "primary.main",
               color: "white",
               transition: "transform 0.2s",
@@ -143,9 +118,23 @@ const Dashboard = () => {
               },
             }}
           >
-            <CardContent sx={{ textAlign: "center" }}>
-              <Email sx={{ fontSize: 60, mb: 2 }} />
-              <MensajesNoLeidosWidget />
+            <CardContent
+              sx={{
+                textAlign: "center",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                flexGrow: 1,
+                p: 3,
+              }}
+            >
+              <Box>
+                <Email sx={{ fontSize: 50, mb: 2 }} />
+                <Typography variant="h6" gutterBottom>
+                  Mensajes sin leer
+                </Typography>
+                <MensajesNoLeidosWidget />
+              </Box>
               <Button
                 variant="contained"
                 color="secondary"
@@ -163,10 +152,9 @@ const Dashboard = () => {
         <Grid item xs={12} sm={6} md={4}>
           <Card
             sx={{
-              height: "200px",
+              minHeight: "180px",
               display: "flex",
               flexDirection: "column",
-              justifyContent: "center",
               bgcolor: "secondary.main",
               color: "white",
               transition: "transform 0.2s",
@@ -176,9 +164,23 @@ const Dashboard = () => {
               },
             }}
           >
-            <CardContent sx={{ textAlign: "center" }}>
-              <Event sx={{ fontSize: 60, mb: 2 }} />
-              <EventosRecientesWidget onlyCount={true} />
+            <CardContent
+              sx={{
+                textAlign: "center",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                flexGrow: 1,
+                p: 3,
+              }}
+            >
+              <Box>
+                <Event sx={{ fontSize: 50, mb: 2 }} />
+                <Typography variant="h6" gutterBottom>
+                  Eventos Próximos
+                </Typography>
+                <EventosRecientesWidget onlyCount={true} />
+              </Box>
               <Button
                 variant="contained"
                 color="primary"
@@ -186,7 +188,7 @@ const Dashboard = () => {
                 sx={{ mt: 2 }}
                 onClick={() => (window.location.href = "/calendario")}
               >
-                Ver eventos
+                Ver calendario
               </Button>
             </CardContent>
           </Card>
@@ -196,10 +198,9 @@ const Dashboard = () => {
         <Grid item xs={12} sm={6} md={4}>
           <Card
             sx={{
-              height: "200px",
+              minHeight: "180px",
               display: "flex",
               flexDirection: "column",
-              justifyContent: "center",
               bgcolor: "success.main",
               color: "white",
               transition: "transform 0.2s",
@@ -209,9 +210,23 @@ const Dashboard = () => {
               },
             }}
           >
-            <CardContent sx={{ textAlign: "center" }}>
-              <Campaign sx={{ fontSize: 60, mb: 2 }} />
-              <AnunciosRecientesWidget onlyCount={true} />
+            <CardContent
+              sx={{
+                textAlign: "center",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                flexGrow: 1,
+                p: 3,
+              }}
+            >
+              <Box>
+                <Campaign sx={{ fontSize: 50, mb: 2 }} />
+                <Typography variant="h6" gutterBottom>
+                  Anuncios Recientes
+                </Typography>
+                <AnunciosRecientesWidget onlyCount={true} />
+              </Box>
               <Button
                 variant="contained"
                 color="warning"
@@ -226,7 +241,7 @@ const Dashboard = () => {
         </Grid>
       </Grid>
 
-      {/* Sección EducaNexo360 - Slogan */}
+      {/* Sección EducaNexo360 - Solo Slogan (SIN BOTONES) */}
       <Box
         sx={{
           textAlign: "center",
@@ -277,50 +292,6 @@ const Dashboard = () => {
           conectando docentes, estudiantes y familias para construir una
           educación más colaborativa y eficiente.
         </Typography>
-
-        {/* Botones de navegación rápida */}
-        <Box
-          sx={{
-            mt: 4,
-            display: "flex",
-            gap: 2,
-            justifyContent: "center",
-            flexWrap: "wrap",
-          }}
-        >
-          <Button
-            variant="outlined"
-            color="primary"
-            onClick={() => (window.location.href = "/mensajes")}
-          >
-            📧 Mensajes
-          </Button>
-          <Button
-            variant="outlined"
-            color="primary"
-            onClick={() => (window.location.href = "/calendario")}
-          >
-            📅 Calendario
-          </Button>
-          <Button
-            variant="outlined"
-            color="primary"
-            onClick={() => (window.location.href = "/anuncios")}
-          >
-            📢 Anuncios
-          </Button>
-          {(user?.tipo === "ADMIN" ||
-            user?.tipo === "RECTOR" ||
-            user?.tipo === "COORDINADOR") && (
-            <Button
-              variant="outlined"
-              color="primary"
-              onClick={() => (window.location.href = "/usuarios")}
-            >
-              👥 Usuarios
-            </Button>
-          )}
-        </Box>
       </Box>
 
       {/* Footer con info del sistema */}
