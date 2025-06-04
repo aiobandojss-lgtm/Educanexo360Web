@@ -1,4 +1,4 @@
-// src/pages/dashboard/Dashboard.tsx - DASHBOARD MINIMALISTA CORREGIDO
+// src/pages/dashboard/Dashboard.tsx - DASHBOARD CORREGIDO SIN DUPLICACIONES
 import React, { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import {
@@ -9,6 +9,7 @@ import {
   Card,
   CardContent,
   Button,
+  Alert,
 } from "@mui/material";
 import {
   Email,
@@ -18,26 +19,51 @@ import {
   ArrowForward,
 } from "@mui/icons-material";
 import { RootState } from "../../redux/store";
-
-// Importamos solo los widgets esenciales
-import {
-  MensajesNoLeidosWidget,
-  EventosRecientesWidget,
-  AnunciosRecientesWidget,
-} from "../../components/dashboard/DashboardWidgets";
+import dashboardService, {
+  DashboardStats,
+} from "../../services/dashboardService";
+import { Escuela } from "../../services/escuelaService";
 
 const Dashboard = () => {
   const { user } = useSelector((state: RootState) => state.auth);
   const [loading, setLoading] = useState(true);
+  const [escuela, setEscuela] = useState<Escuela | null>(null);
+  const [estadisticas, setEstadisticas] = useState<DashboardStats>({
+    mensajesSinLeer: 0,
+    eventosProximos: 0,
+    anunciosRecientes: 0,
+  });
 
   useEffect(() => {
-    // Tiempo de carga reducido
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 500);
+    const cargarDashboard = async () => {
+      try {
+        setLoading(true);
 
-    return () => clearTimeout(timer);
-  }, []);
+        // Cargar información de la escuela
+        if (user?.escuelaId) {
+          const escuelaData = await dashboardService.obtenerEscuela(
+            user.escuelaId
+          );
+          if (escuelaData) {
+            setEscuela(escuelaData);
+          }
+        }
+
+        // Cargar estadísticas del dashboard
+        const stats = await dashboardService.obtenerEstadisticas();
+        setEstadisticas(stats);
+      } catch (error) {
+        console.error("Error cargando dashboard:", error);
+        // Mantener valores por defecto en caso de error
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (user) {
+      cargarDashboard();
+    }
+  }, [user]);
 
   if (loading) {
     return (
@@ -73,11 +99,16 @@ const Dashboard = () => {
           <School sx={{ mr: 2, fontSize: 40, color: "primary.main" }} />
           <Box>
             <Typography variant="h4" color="primary.main" fontWeight="bold">
-              Mi Institución Educativa
+              {escuela?.nombre || "Cargando institución..."}
             </Typography>
             <Typography variant="subtitle1" color="text.secondary">
               Sistema de Comunicación Escolar
             </Typography>
+            {escuela?.codigo && (
+              <Typography variant="caption" color="text.secondary">
+                Código: {escuela.codigo}
+              </Typography>
+            )}
           </Box>
         </Box>
 
@@ -100,21 +131,37 @@ const Dashboard = () => {
         Dashboard
       </Typography>
 
-      {/* Tarjetas Esenciales - Solo 3 (ALTURA AJUSTADA) */}
-      <Grid container spacing={4} justifyContent="center" sx={{ mb: 6 }}>
+      {/* Verificación de escuela */}
+      {!escuela && (
+        <Alert severity="warning" sx={{ mb: 3 }}>
+          No se pudo cargar la información de la institución educativa.
+        </Alert>
+      )}
+
+      {/* Tarjetas Esenciales - Exactamente como en la vista previa */}
+      <Grid
+        container
+        spacing={4}
+        justifyContent="center"
+        sx={{
+          mb: 6,
+          maxWidth: "1000px",
+          mx: "auto",
+        }}
+      >
         {/* Mensajes sin leer */}
         <Grid item xs={12} sm={6} md={4}>
           <Card
             sx={{
-              minHeight: "180px",
+              minHeight: "200px",
               display: "flex",
               flexDirection: "column",
-              bgcolor: "primary.main",
+              background: "linear-gradient(135deg, #1976d2 0%, #1565c0 100%)",
               color: "white",
-              transition: "transform 0.2s",
+              transition: "transform 0.2s, box-shadow 0.2s",
               "&:hover": {
                 transform: "translateY(-4px)",
-                boxShadow: 6,
+                boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
               },
             }}
           >
@@ -130,17 +177,26 @@ const Dashboard = () => {
             >
               <Box>
                 <Email sx={{ fontSize: 50, mb: 2 }} />
-                <Typography variant="h6" gutterBottom>
+                <Typography variant="h6" gutterBottom fontWeight={500}>
                   Mensajes sin leer
                 </Typography>
-                <MensajesNoLeidosWidget />
+                <Typography variant="h2" sx={{ fontWeight: "bold", my: 2 }}>
+                  {estadisticas.mensajesSinLeer}
+                </Typography>
               </Box>
               <Button
                 variant="contained"
-                color="secondary"
                 endIcon={<ArrowForward />}
-                sx={{ mt: 2 }}
+                sx={{
+                  mt: 2,
+                  bgcolor: "rgba(255,255,255,0.2)",
+                  color: "white",
+                  "&:hover": {
+                    bgcolor: "rgba(255,255,255,0.3)",
+                  },
+                }}
                 onClick={() => (window.location.href = "/mensajes")}
+                fullWidth
               >
                 Ver todos
               </Button>
@@ -152,15 +208,15 @@ const Dashboard = () => {
         <Grid item xs={12} sm={6} md={4}>
           <Card
             sx={{
-              minHeight: "180px",
+              minHeight: "200px",
               display: "flex",
               flexDirection: "column",
-              bgcolor: "secondary.main",
+              background: "linear-gradient(135deg, #9c27b0 0%, #7b1fa2 100%)",
               color: "white",
-              transition: "transform 0.2s",
+              transition: "transform 0.2s, box-shadow 0.2s",
               "&:hover": {
                 transform: "translateY(-4px)",
-                boxShadow: 6,
+                boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
               },
             }}
           >
@@ -176,17 +232,26 @@ const Dashboard = () => {
             >
               <Box>
                 <Event sx={{ fontSize: 50, mb: 2 }} />
-                <Typography variant="h6" gutterBottom>
+                <Typography variant="h6" gutterBottom fontWeight={500}>
                   Eventos Próximos
                 </Typography>
-                <EventosRecientesWidget onlyCount={true} />
+                <Typography variant="h2" sx={{ fontWeight: "bold", my: 2 }}>
+                  {estadisticas.eventosProximos}
+                </Typography>
               </Box>
               <Button
                 variant="contained"
-                color="primary"
                 endIcon={<ArrowForward />}
-                sx={{ mt: 2 }}
+                sx={{
+                  mt: 2,
+                  bgcolor: "#1976d2",
+                  color: "white",
+                  "&:hover": {
+                    bgcolor: "#1565c0",
+                  },
+                }}
                 onClick={() => (window.location.href = "/calendario")}
+                fullWidth
               >
                 Ver calendario
               </Button>
@@ -198,15 +263,15 @@ const Dashboard = () => {
         <Grid item xs={12} sm={6} md={4}>
           <Card
             sx={{
-              minHeight: "180px",
+              minHeight: "200px",
               display: "flex",
               flexDirection: "column",
-              bgcolor: "success.main",
+              background: "linear-gradient(135deg, #388e3c 0%, #2e7d32 100%)",
               color: "white",
-              transition: "transform 0.2s",
+              transition: "transform 0.2s, box-shadow 0.2s",
               "&:hover": {
                 transform: "translateY(-4px)",
-                boxShadow: 6,
+                boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
               },
             }}
           >
@@ -222,17 +287,26 @@ const Dashboard = () => {
             >
               <Box>
                 <Campaign sx={{ fontSize: 50, mb: 2 }} />
-                <Typography variant="h6" gutterBottom>
+                <Typography variant="h6" gutterBottom fontWeight={500}>
                   Anuncios Recientes
                 </Typography>
-                <AnunciosRecientesWidget onlyCount={true} />
+                <Typography variant="h2" sx={{ fontWeight: "bold", my: 2 }}>
+                  {estadisticas.anunciosRecientes}
+                </Typography>
               </Box>
               <Button
                 variant="contained"
-                color="warning"
                 endIcon={<ArrowForward />}
-                sx={{ mt: 2 }}
+                sx={{
+                  mt: 2,
+                  bgcolor: "#ff9800",
+                  color: "white",
+                  "&:hover": {
+                    bgcolor: "#f57c00",
+                  },
+                }}
                 onClick={() => (window.location.href = "/anuncios")}
+                fullWidth
               >
                 Ver anuncios
               </Button>
@@ -241,26 +315,26 @@ const Dashboard = () => {
         </Grid>
       </Grid>
 
-      {/* Sección EducaNexo360 - Solo Slogan (SIN BOTONES) */}
+      {/* Sección EducaNexo360 - Mejorada */}
       <Box
         sx={{
           textAlign: "center",
           py: 6,
           px: 4,
-          bgcolor: "grey.50",
+          bgcolor: "#fafafa",
           borderRadius: 3,
-          border: "1px solid",
-          borderColor: "grey.200",
+          border: "1px solid #e0e0e0",
         }}
       >
         <Typography
-          variant="h3"
+          variant="h4"
           color="primary.main"
           gutterBottom
           sx={{
             fontWeight: "bold",
             fontStyle: "italic",
             mb: 3,
+            lineHeight: 1.4,
           }}
         >
           "La plataforma que une a toda la comunidad educativa en un solo lugar"
@@ -268,11 +342,10 @@ const Dashboard = () => {
 
         <Typography
           variant="h2"
-          color="secondary.main"
-          gutterBottom
           sx={{
             fontWeight: "bold",
             mb: 2,
+            color: "#9c27b0",
             textShadow: "2px 2px 4px rgba(0,0,0,0.1)",
           }}
         >
@@ -299,8 +372,7 @@ const Dashboard = () => {
         sx={{
           mt: 4,
           pt: 3,
-          borderTop: "1px solid",
-          borderColor: "grey.300",
+          borderTop: "1px solid #e0e0e0",
           textAlign: "center",
         }}
       >
