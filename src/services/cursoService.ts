@@ -199,18 +199,26 @@ const cursoService = {
 
   /**
    * Elimina una asignatura de un curso
+   * ✅ CORREGIDO: Cambio de PATCH a PUT para coincidir con las rutas del backend
    */
   async eliminarAsignaturaCurso(
     cursoId: string,
     asignaturaId: string
   ): Promise<any> {
     try {
-      const response = await api.patch(`/asignaturas/${asignaturaId}`, {
-        cursoId: null,
+      console.log(
+        `🔄 Removiendo asignatura ${asignaturaId} del curso ${cursoId}`
+      );
+
+      // ✅ CAMBIO PRINCIPAL: PATCH → PUT
+      const response = await api.put(`/asignaturas/${asignaturaId}`, {
+        cursoId: null, // Remover la asignatura del curso
       });
+
+      console.log("✅ Asignatura removida del curso exitosamente");
       return response.data;
     } catch (error) {
-      console.error("Error al eliminar asignatura del curso:", error);
+      console.error("❌ Error al eliminar asignatura del curso:", error);
       throw error;
     }
   },
