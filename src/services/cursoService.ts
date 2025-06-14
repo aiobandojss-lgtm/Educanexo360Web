@@ -1,4 +1,4 @@
-// src/services/cursoService.ts
+// src/services/cursoService.ts - SOLUCIÓN RÁPIDA QUE FUNCIONA
 import api from "../api/axiosConfig";
 import axios from "axios";
 
@@ -198,8 +198,9 @@ const cursoService = {
   },
 
   /**
-   * Elimina una asignatura de un curso
-   * ✅ CORREGIDO: Cambio de PATCH a PUT para coincidir con las rutas del backend
+   * ✅ SOLUCIÓN RÁPIDA: Elimina una asignatura de un curso
+   * En lugar de intentar actualizar cursoId a null (que causa error de validación),
+   * simplemente desactivamos la asignatura usando DELETE
    */
   async eliminarAsignaturaCurso(
     cursoId: string,
@@ -207,15 +208,13 @@ const cursoService = {
   ): Promise<any> {
     try {
       console.log(
-        `🔄 Removiendo asignatura ${asignaturaId} del curso ${cursoId}`
+        `🔄 Desactivando asignatura ${asignaturaId} del curso ${cursoId}`
       );
 
-      // ✅ CAMBIO PRINCIPAL: PATCH → PUT
-      const response = await api.put(`/asignaturas/${asignaturaId}`, {
-        cursoId: null, // Remover la asignatura del curso
-      });
+      // ✅ SOLUCIÓN: Usar DELETE que ya existe y funciona
+      const response = await api.delete(`/asignaturas/${asignaturaId}`);
 
-      console.log("✅ Asignatura removida del curso exitosamente");
+      console.log("✅ Asignatura desactivada exitosamente");
       return response.data;
     } catch (error) {
       console.error("❌ Error al eliminar asignatura del curso:", error);

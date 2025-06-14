@@ -79,6 +79,23 @@ const asignaturaService = {
       throw error;
     }
   },
+
+  desasignarDeCurso: async (id: string) => {
+    try {
+      console.log(`🔄 Desasignando asignatura ${id} de su curso`);
+      const response = await axiosInstance.patch(
+        `/asignaturas/${id}/desasignar-curso`
+      );
+      console.log("✅ Asignatura desasignada exitosamente");
+      return response.data;
+    } catch (error) {
+      console.error(
+        `❌ Error al desasignar asignatura ${id} del curso:`,
+        error
+      );
+      throw error;
+    }
+  },
 };
 
 export default asignaturaService;

@@ -76,6 +76,7 @@ const API_ROUTES = {
     UPDATE: (id: string) => `/asignaturas/${id}`,
     DELETE: (id: string) => `/asignaturas/${id}`,
     GET_BY_CURSO: (cursoId: string) => `/asignaturas/curso/${cursoId}`,
+    DESASIGNAR_DE_CURSO: (id: string) => `/asignaturas/${id}/desasignar-curso`,
   },
 
   // Rutas de asistencia
