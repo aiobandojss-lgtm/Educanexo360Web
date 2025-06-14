@@ -198,9 +198,8 @@ const cursoService = {
   },
 
   /**
-   * ✅ SOLUCIÓN RÁPIDA: Elimina una asignatura de un curso
-   * En lugar de intentar actualizar cursoId a null (que causa error de validación),
-   * simplemente desactivamos la asignatura usando DELETE
+   * ✅ SOLUCIÓN: Remueve una asignatura del curso (sin desactivarla)
+   * Primero obtenemos los datos actuales, luego actualizamos sin cursoId
    */
   async eliminarAsignaturaCurso(
     cursoId: string,
@@ -208,16 +207,32 @@ const cursoService = {
   ): Promise<any> {
     try {
       console.log(
-        `🔄 Desactivando asignatura ${asignaturaId} del curso ${cursoId}`
+        `🔄 Removiendo asignatura ${asignaturaId} del curso ${cursoId}`
       );
 
-      // ✅ SOLUCIÓN: Usar DELETE que ya existe y funciona
-      const response = await api.delete(`/asignaturas/${asignaturaId}`);
+      // 1. Obtener datos actuales de la asignatura
+      const asignaturaResponse = await api.get(`/asignaturas/${asignaturaId}`);
 
-      console.log("✅ Asignatura desactivada exitosamente");
+      if (!asignaturaResponse.data?.success) {
+        throw new Error("No se pudo obtener la asignatura");
+      }
+
+      const asignaturaActual = asignaturaResponse.data.data;
+
+      // 2. Crear payload sin cursoId para removerla del curso
+      const { cursoId: _, ...datosParaActualizar } = asignaturaActual;
+
+      // 3. Actualizar la asignatura sin cursoId (la remueve del curso)
+      const response = await api.put(`/asignaturas/${asignaturaId}`, {
+        ...datosParaActualizar,
+        estado: "ACTIVO", // Mantener la asignatura activa
+        // No incluir cursoId para que quede disponible para otros cursos
+      });
+
+      console.log("✅ Asignatura removida del curso exitosamente");
       return response.data;
     } catch (error) {
-      console.error("❌ Error al eliminar asignatura del curso:", error);
+      console.error("❌ Error al remover asignatura del curso:", error);
       throw error;
     }
   },
