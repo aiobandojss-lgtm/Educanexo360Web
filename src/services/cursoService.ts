@@ -198,8 +198,8 @@ const cursoService = {
   },
 
   /**
-   * ✅ SOLUCIÓN: Remueve una asignatura del curso (sin desactivarla)
-   * Primero obtenemos los datos actuales, luego actualizamos sin cursoId
+   * ✅ SOLUCIÓN REAL: Remueve una asignatura del curso
+   * Envía cursoId como string vacío para que el backend la desasigne
    */
   async eliminarAsignaturaCurso(
     cursoId: string,
@@ -210,23 +210,9 @@ const cursoService = {
         `🔄 Removiendo asignatura ${asignaturaId} del curso ${cursoId}`
       );
 
-      // 1. Obtener datos actuales de la asignatura
-      const asignaturaResponse = await api.get(`/asignaturas/${asignaturaId}`);
-
-      if (!asignaturaResponse.data?.success) {
-        throw new Error("No se pudo obtener la asignatura");
-      }
-
-      const asignaturaActual = asignaturaResponse.data.data;
-
-      // 2. Crear payload sin cursoId para removerla del curso
-      const { cursoId: _, ...datosParaActualizar } = asignaturaActual;
-
-      // 3. Actualizar la asignatura sin cursoId (la remueve del curso)
+      // ✅ SOLUCIÓN REAL: El backend modificado acepta string vacío para desasignar
       const response = await api.put(`/asignaturas/${asignaturaId}`, {
-        ...datosParaActualizar,
-        estado: "ACTIVO", // Mantener la asignatura activa
-        // No incluir cursoId para que quede disponible para otros cursos
+        cursoId: "", // String vacío dispara la lógica de desasignación en el backend
       });
 
       console.log("✅ Asignatura removida del curso exitosamente");
