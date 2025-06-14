@@ -209,12 +209,9 @@ const cursoService = {
       console.log(
         `🔄 Removiendo asignatura ${asignaturaId} del curso ${cursoId}`
       );
-
-      // ✅ SOLUCIÓN REAL: El backend modificado acepta string vacío para desasignar
-      const response = await api.put(`/asignaturas/${asignaturaId}`, {
-        cursoId: "", // String vacío dispara la lógica de desasignación en el backend
-      });
-
+      const response = await api.patch(
+        `/asignaturas/${asignaturaId}/remover-curso`
+      );
       console.log("✅ Asignatura removida del curso exitosamente");
       return response.data;
     } catch (error) {
