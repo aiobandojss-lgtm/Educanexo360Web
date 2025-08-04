@@ -130,14 +130,11 @@ const NuevoMensaje: React.FC = () => {
   
   // Detectar si el usuario es ACUDIENTE o ESTUDIANTE
   useEffect(() => {
-    if (user?.tipo === 'ACUDIENTE') {
+    if (user?.tipo === 'ACUDIENTE' || user?.tipo === 'ESTUDIANTE') {
       setIsAcudiente(true);
     }
     
     // Si es estudiante, redirigir a la página de mensajes
-    if (user?.tipo === 'ESTUDIANTE') {
-      navigate('/mensajes');
-    }
   }, [user?.tipo, navigate]);
   
   // Si el usuario no puede enviar masivos, forzar a individual

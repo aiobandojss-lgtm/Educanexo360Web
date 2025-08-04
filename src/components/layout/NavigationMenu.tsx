@@ -120,10 +120,11 @@ const NavigationMenu: React.FC = () => {
           title: "Enviados",
           icon: <Send {...iconProps} />,
           path: "/mensajes/enviados",
-          // Excluimos ESTUDIANTE de los roles que pueden ver "Enviados"
+          
           allowedRoles: [
             "ADMIN",
             "DOCENTE",
+            "ESTUDIANTE",
             "PADRE",
             "ACUDIENTE",
             "COORDINADOR",
@@ -164,12 +165,13 @@ const NavigationMenu: React.FC = () => {
           title: "Nuevo Mensaje",
           icon: <PenSquare {...iconProps} />,
           path: "/mensajes/nuevo",
-          // Excluimos ESTUDIANTE de los roles que pueden crear "Nuevo Mensaje"
+          
           allowedRoles: [
             "ADMIN",
             "DOCENTE",
             "PADRE",
             "ACUDIENTE",
+            "ESTUDIANTE",
             "COORDINADOR",
             "RECTOR",
             "ADMINISTRATIVO",
