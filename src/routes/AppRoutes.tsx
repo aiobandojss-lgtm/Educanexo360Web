@@ -70,6 +70,14 @@ import {
   FormularioAnuncio,
 } from "../pages/anuncios";
 
+import MisTareas from "../pages/tareas/MisTareas";
+import ListaTareas from "../pages/tareas/ListaTareas";
+import DetalleTarea from "../pages/tareas/DetalleTarea";
+import FormularioTarea from "../pages/tareas/FormularioTarea";
+import EntregarTarea from "../pages/tareas/EntregarTarea";
+import CalificarEntrega from "../pages/tareas/CalificarEntrega";
+import ListaEntregas from "../pages/tareas/ListaEntregas";
+
 // Componente para rutas protegidas
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -637,7 +645,103 @@ const AppRoutes = () => {
         <Route path="/anuncios/:id" element={<DetalleAnuncio />} />
         <Route path="/anuncios/nuevo" element={<FormularioAnuncio />} />
         <Route path="/anuncios/editar/:id" element={<FormularioAnuncio />} />
+         {/* Rutas de Tareas */}
+          <Route path="/tareas">
+            {/* Vista principal - Estudiantes/Acudientes */}
+            <Route
+              index
+              element={
+                <ProtectedRoute allowedRoles={["ESTUDIANTE", "ACUDIENTE"]}>
+                  <MisTareas />
+                </ProtectedRoute>
+              }
+            />    
+            {/* Gestión de tareas - Docentes/Admin */}
+            <Route
+              path="docente"
+              element={
+                <ProtectedRoute
+                  allowedRoles={["ADMIN", "DOCENTE", "RECTOR", "COORDINADOR"]}
+                >
+                  <ListaTareas />
+                </ProtectedRoute>
+              }
+            />
+            {/* Nueva tarea - Docentes/Admin */}
+            <Route
+              path="nuevo"
+              element={
+                <ProtectedRoute
+                  allowedRoles={["ADMIN", "DOCENTE", "RECTOR", "COORDINADOR"]}
+                >
+                  <FormularioTarea />
+                </ProtectedRoute>
+              }
+            />
+            {/* Editar tarea - Docentes/Admin */}
+            <Route
+              path="editar/:id"
+              element={
+                <ProtectedRoute
+                  allowedRoles={["ADMIN", "DOCENTE", "RECTOR", "COORDINADOR"]}
+                >
+                  <FormularioTarea />
+                </ProtectedRoute>
+              }
+            />
+            {/* Ver detalle de tarea - Todos los roles */}
+            <Route
+              path=":id"
+              element={
+                <ProtectedRoute
+                  allowedRoles={[
+                    "ADMIN",
+                    "DOCENTE",
+                    "ESTUDIANTE",
+                    "ACUDIENTE",
+                    "RECTOR",
+                    "COORDINADOR",
+                  ]}
+                >
+                  <DetalleTarea />
+                </ProtectedRoute>
+              }
+            />
 
+            {/* Entregar tarea - Solo estudiantes */}
+            <Route
+              path=":id/entregar"
+              element={
+                <ProtectedRoute allowedRoles={["ESTUDIANTE"]}>
+                  <EntregarTarea />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* ✅ NUEVA RUTA: Ver lista de entregas - Docentes/Admin */}
+            <Route
+              path=":id/entregas"
+              element={
+                <ProtectedRoute
+                  allowedRoles={["ADMIN", "DOCENTE", "RECTOR", "COORDINADOR"]}
+                >
+                  <ListaEntregas />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Calificar entrega - Docentes/Admin */}
+            <Route
+              path=":id/entregas/:entregaId/calificar"
+              element={
+                <ProtectedRoute
+                  allowedRoles={["ADMIN", "DOCENTE", "RECTOR", "COORDINADOR"]}
+                >
+                  <CalificarEntrega />
+                </ProtectedRoute>
+              }
+            />
+          </Route>
         {/* Ruta para redireccionar a 404 o al dashboard */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import { RootState } from "../../redux/store";
 
+
 interface NavigationItem {
   title: string;
   icon: React.ReactNode;
@@ -307,6 +308,39 @@ const NavigationMenu: React.FC = () => {
         "COORDINADOR",
         "RECTOR",
         "ADMINISTRATIVO",
+      ],
+    },
+    {
+      title: "Tareas",
+      icon: <CheckSquare {...iconProps} />,
+      path: "/tareas",
+      allowedRoles: [
+        "ADMIN",
+        "DOCENTE",
+        "ESTUDIANTE",
+        "ACUDIENTE",
+        "COORDINADOR",
+        "RECTOR",
+      ],
+      children: [
+        {
+          title: "Mis Tareas",
+          icon: <CheckSquare {...iconProps} />,
+          path: "/tareas",
+          allowedRoles: ["ESTUDIANTE", "ACUDIENTE"],
+        },
+        {
+          title: "Gestionar Tareas",
+          icon: <Edit {...iconProps} />,
+          path: "/tareas/docente",
+          allowedRoles: ["ADMIN", "DOCENTE", "COORDINADOR", "RECTOR"],
+        },
+        {
+          title: "Nueva Tarea",
+          icon: <PenSquare {...iconProps} />,
+          path: "/tareas/nuevo",
+          allowedRoles: ["ADMIN", "DOCENTE", "COORDINADOR", "RECTOR"],
+        },
       ],
     },
     {

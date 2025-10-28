@@ -96,6 +96,19 @@ const asignaturaService = {
       throw error;
     }
   },
+  
+  listarAsignaturas: async (params: any = {}) => {
+    try {
+      const response = await axiosInstance.get("/asignaturas", { params });
+      if (response.data?.success) {
+        return response.data;
+      }
+      return response.data;
+    } catch (error) {
+      console.error("Error al listar asignaturas:", error);
+      throw error;
+    }
+  },
 };
 
 export default asignaturaService;

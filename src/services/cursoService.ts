@@ -17,6 +17,12 @@ interface Docente {
   apellidos: string;
 }
 
+interface ListarCursosParams {
+  pagina?: number;
+  limite?: number;
+  busqueda?: string;
+}
+
 export interface CursoDto {
   _id: string;
   nombre: string;
@@ -367,6 +373,18 @@ const cursoService = {
       throw error;
     }
   },
+
+  listarCursos: async (params: any = {}) => {
+    try {
+      const response = await api.get("/cursos", { params });
+      return response.data;
+    } catch (error) {
+      console.error("Error al listar cursos:", error);
+      throw error;
+    }
+  },
+
+
 };
 
 export default cursoService;

@@ -21,7 +21,7 @@
     "@types/recharts": "^1.8.29",
     "axios": "^1.8.1",
     "date-fns": "^4.1.0",
-    "dayjs": "^1.11.13",
+    "dayjs": "^1.11.18",
     "file-saver": "^2.0.5",
     "formik": "^2.4.6",
     "jspdf-autotable": "^5.0.2",

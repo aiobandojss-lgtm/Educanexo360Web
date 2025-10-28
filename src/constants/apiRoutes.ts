@@ -215,6 +215,39 @@ const API_ROUTES = {
     // Rutas públicas
     CREAR_SOLICITUD: "/public/registro/solicitudes",
   },
+  
+  // Rutas de Tareas
+  TAREAS: {
+    BASE: "/tareas",
+    GET_ALL: "/tareas",
+    GET_BY_ID: (id: string) => `/tareas/${id}`,
+    CREATE: "/tareas",
+    UPDATE: (id: string) => `/tareas/${id}`,
+    DELETE: (id: string) => `/tareas/${id}`,
+    CERRAR: (id: string) => `/tareas/${id}/cerrar`,
+    
+    // Archivos de referencia (material del docente)
+    SUBIR_ARCHIVOS_REF: (id: string) => `/tareas/${id}/archivos`,
+    ELIMINAR_ARCHIVO_REF: (id: string, archivoId: string) => 
+      `/tareas/${id}/archivos/${archivoId}`,
+    DESCARGAR_ARCHIVO: (id: string, archivoId: string) => 
+      `/tareas/${id}/archivos/${archivoId}`,
+    
+    // Entregas de estudiantes
+    MARCAR_VISTA: (id: string) => `/tareas/${id}/marcar-vista`,
+    ENTREGAR: (id: string) => `/tareas/${id}/entregar`,
+    MI_ENTREGA: (id: string) => `/tareas/${id}/mi-entrega`,
+    VER_ENTREGAS: (id: string) => `/tareas/${id}/entregas`,
+    CALIFICAR: (id: string, entregaId: string) => 
+      `/tareas/${id}/entregas/${entregaId}`,
+    
+    // Vistas especiales
+    MIS_TAREAS: "/tareas/especial/mis-tareas",
+    TAREAS_ESTUDIANTE: (estudianteId: string) => 
+      `/tareas/especial/estudiante/${estudianteId}`,
+    ESTADISTICAS: "/tareas/especial/estadisticas",
+    PROXIMAS_VENCER: "/tareas/especial/proximas-vencer",
+  },
 
   // Rutas públicas
   PUBLIC: {
