@@ -23,6 +23,27 @@ export const ROLE_HIERARCHY = {
 };
 
 /**
+ * Información académica del usuario
+ */
+export interface AcademicInfo {
+  grado?: string;
+  docente_principal?: string;
+  cursos?: string[];
+  estudiantes_asociados?: string[]; // IDs de estudiantes asociados (para acudientes)
+  asignaturas?: string[];
+}
+
+/**
+ * Información de contacto del usuario
+ */
+export interface ContactInfo {
+  telefono?: string;
+  direccion?: string;
+  ciudad?: string;
+  pais?: string;
+}
+
+/**
  * Interfaz para el usuario con todos los campos requeridos
  */
 export interface User {
@@ -33,6 +54,11 @@ export interface User {
   tipo: string;
   escuelaId: string;
   estado: string;
+  info_academica?: AcademicInfo;
+  info_contacto?: ContactInfo;
+  avatar?: string;
+  fecha_nacimiento?: string;
+  genero?: string;
 }
 
 /**
@@ -73,6 +99,11 @@ export interface UserResponse {
   tipo: string;
   escuelaId: string;
   estado: string;
+  info_academica?: AcademicInfo;
+  info_contacto?: ContactInfo;
+  avatar?: string;
+  fecha_nacimiento?: string;
+  genero?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -116,7 +147,25 @@ export const userHasRole = (user: User | null, roles: string[]): boolean => {
   return roles.includes(user.tipo);
 };
 
+/**
+ * Función auxiliar para obtener el nombre completo del usuario
+ */
+export const getNombreCompleto = (user: User | null): string => {
+  if (!user) return '';
+  return `${user.nombre} ${user.apellidos}`.trim();
+};
+
+/**
+ * Función auxiliar para obtener el grado del estudiante
+ */
+export const getGrado = (user: User | null): string => {
+  if (!user || !user.info_academica?.grado) return 'Sin grado';
+  return user.info_academica.grado;
+};
+
 export default {
   ensureUserHasState,
-  userHasRole
+  userHasRole,
+  getNombreCompleto,
+  getGrado
 };

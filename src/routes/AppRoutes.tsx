@@ -77,7 +77,7 @@ import FormularioTarea from "../pages/tareas/FormularioTarea";
 import EntregarTarea from "../pages/tareas/EntregarTarea";
 import CalificarEntrega from "../pages/tareas/CalificarEntrega";
 import ListaEntregas from "../pages/tareas/ListaEntregas";
-
+import TareasWrapper from "../pages/tareas/TareasWrapper";
 // Componente para rutas protegidas
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -647,16 +647,36 @@ const AppRoutes = () => {
         <Route path="/anuncios/editar/:id" element={<FormularioAnuncio />} />
          {/* Rutas de Tareas */}
           <Route path="/tareas">
-            {/* Vista principal - Estudiantes/Acudientes */}
+            {/* Ruta principal - Usa TareasWrapper para decidir qué mostrar */}
             <Route
               index
               element={
-                <ProtectedRoute allowedRoles={["ESTUDIANTE", "ACUDIENTE"]}>
+                <ProtectedRoute
+                  allowedRoles={[
+                    "ESTUDIANTE",
+                    "ACUDIENTE",
+                    "ADMIN",
+                    "DOCENTE",
+                    "RECTOR",
+                    "COORDINADOR",
+                  ]}
+                >
+                  <TareasWrapper />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* ✅ NUEVA RUTA: Vista de acudiente para ver tareas de un hijo específico */}
+            <Route
+              path="hijo/:estudianteId"
+              element={
+                <ProtectedRoute allowedRoles={["ACUDIENTE"]}>
                   <MisTareas />
                 </ProtectedRoute>
               }
-            />    
-            {/* Gestión de tareas - Docentes/Admin */}
+            />
+
+            {/* Gestión de tareas - Docentes/Admin (ruta alternativa) */}
             <Route
               path="docente"
               element={
@@ -667,6 +687,7 @@ const AppRoutes = () => {
                 </ProtectedRoute>
               }
             />
+
             {/* Nueva tarea - Docentes/Admin */}
             <Route
               path="nuevo"
@@ -678,6 +699,7 @@ const AppRoutes = () => {
                 </ProtectedRoute>
               }
             />
+
             {/* Editar tarea - Docentes/Admin */}
             <Route
               path="editar/:id"
@@ -689,6 +711,7 @@ const AppRoutes = () => {
                 </ProtectedRoute>
               }
             />
+
             {/* Ver detalle de tarea - Todos los roles */}
             <Route
               path=":id"
@@ -718,7 +741,7 @@ const AppRoutes = () => {
               }
             />
 
-            {/* ✅ NUEVA RUTA: Ver lista de entregas - Docentes/Admin */}
+            {/* Ver lista de entregas - Docentes/Admin */}
             <Route
               path=":id/entregas"
               element={
