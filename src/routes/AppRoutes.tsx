@@ -9,6 +9,7 @@ import MainLayout from "../components/layout/MainLayout";
 
 // Página de configuración inicial
 import SetupPage from "../pages/system/SetupPage";
+import NotFoundPage from "../pages/system/NotFoundPage";
 
 // Páginas públicas
 import Login from "../pages/auth/Login";
@@ -113,9 +114,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 const AppRoutes = () => {
   return (
     <Routes>
-      {/* Ruta de configuración inicial */}
-      <Route path="/setup" element={<SetupPage />} />
-
+      
       {/* Rutas públicas */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
@@ -766,7 +765,7 @@ const AppRoutes = () => {
             />
           </Route>
         {/* Ruta para redireccionar a 404 o al dashboard */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
   );
