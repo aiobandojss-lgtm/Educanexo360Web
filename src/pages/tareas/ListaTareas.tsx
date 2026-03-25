@@ -1,5 +1,5 @@
 // src/screens/tareas/ListaTareas.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import {
   Box,
   Button,
@@ -13,20 +13,13 @@ import {
 } from "@mui/material";
 import { Add as AddIcon, Search as SearchIcon } from "@mui/icons-material";
 import { Link, useNavigate } from "react-router-dom";
-import tareaService from "../../services/tareaService";
 import { Tarea, TareaFilters } from "../../types/tarea.types";
+import { useTareasFiltradas } from "../../hooks/useAppQueries";
 import TarjetaTarea from "../../components/tareas/TarjetaTarea";
 import useAuth from "../../hooks/useAuth";
 
 const ListaTareas: React.FC = () => {
-  const [tareas, setTareas] = useState<Tarea[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const [totalPaginas, setTotalPaginas] = useState<number>(1);
-  const [filtros, setFiltros] = useState<TareaFilters>({
-    pagina: 1,
-    limite: 10,
-  });
+  const [filtros, setFiltros] = useState<TareaFilters>({ pagina: 1, limite: 10 });
   const [busqueda, setBusqueda] = useState<string>("");
 
   const navigate = useNavigate();
@@ -38,45 +31,22 @@ const ListaTareas: React.FC = () => {
     user?.tipo === "RECTOR" ||
     user?.tipo === "COORDINADOR";
 
-  useEffect(() => {
-    cargarTareas();
+  const params = useMemo(() => {
+    const p: Record<string, unknown> = {
+      pagina: filtros.pagina || 1,
+      limite: filtros.limite || 10,
+    };
+    if (filtros.estado) p.estado = filtros.estado;
+    if (filtros.prioridad) p.prioridad = filtros.prioridad;
+    if (filtros.busqueda) p.busqueda = filtros.busqueda;
+    return p;
   }, [filtros]);
 
-  const cargarTareas = async () => {
-    try {
-      setLoading(true);
-      setError(null);
+  const { data: response, isLoading: loading, isError } = useTareasFiltradas(params);
 
-      // ✅ CORRECCIÓN: Solo agregar parámetros si tienen valor
-      const params: any = {
-        pagina: filtros.pagina || 1,
-        limite: filtros.limite || 10,
-      };
-
-      // Solo agregar si tienen valor (no strings vacíos)
-      if (filtros.estado) {
-        params.estado = filtros.estado;
-      }
-      if (filtros.prioridad) {
-        params.prioridad = filtros.prioridad;
-      }
-      if (filtros.busqueda) {
-        params.busqueda = filtros.busqueda;
-      }
-
-      const response = await tareaService.listarTareas(params);
-      setTareas(response.data || []);
-      setTotalPaginas(response.meta?.paginas || 1);
-      setLoading(false);
-    } catch (err: any) {
-      console.error("Error al cargar tareas:", err);
-      setError(
-        err.response?.data?.message ||
-          "No se pudieron cargar las tareas. Intente nuevamente."
-      );
-      setLoading(false);
-    }
-  };
+  const tareas: Tarea[] = response?.data ?? [];
+  const totalPaginas: number = response?.meta?.paginas ?? 1;
+  const error = isError ? "No se pudieron cargar las tareas. Intente nuevamente." : null;
 
   const handleBuscar = () => {
     setFiltros({

@@ -149,7 +149,8 @@ const DetalleTarea: React.FC = () => {
 
     try {
       await tareaService.cerrarTarea(id);
-      window.location.reload();
+      // Navegar a la misma ruta fuerza re-montaje del componente sin recargar la página
+      navigate(0);
     } catch (err: any) {
       alert(
         err.response?.data?.message || "No se pudo cerrar la tarea"

@@ -1,6 +1,7 @@
 // src/pages/dashboard/Dashboard.tsx - DASHBOARD CORREGIDO SIN DUPLICACIONES
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import {
   Box,
   Grid,
@@ -19,51 +20,23 @@ import {
   ArrowForward,
 } from "@mui/icons-material";
 import { RootState } from "../../redux/store";
-import dashboardService, {
-  DashboardStats,
-} from "../../services/dashboardService";
-import { Escuela } from "../../services/escuelaService";
+import { useDashboardStats, useEscuela } from "../../hooks/useAppQueries";
 
 const Dashboard = () => {
   const { user } = useSelector((state: RootState) => state.auth);
-  const [loading, setLoading] = useState(true);
-  const [escuela, setEscuela] = useState<Escuela | null>(null);
-  const [estadisticas, setEstadisticas] = useState<DashboardStats>({
+  const navigate = useNavigate();
+
+  // Caché inteligente: la segunda visita es instantánea
+  const { data: estadisticas, isLoading: loadingStats } = useDashboardStats();
+  const { data: escuela, isLoading: loadingEscuela } = useEscuela();
+
+  const loading = loadingStats || loadingEscuela;
+
+  const stats = estadisticas ?? {
     mensajesSinLeer: 0,
     eventosProximos: 0,
     anunciosRecientes: 0,
-  });
-
-  useEffect(() => {
-    const cargarDashboard = async () => {
-      try {
-        setLoading(true);
-
-        // Cargar información de la escuela
-        if (user?.escuelaId) {
-          const escuelaData = await dashboardService.obtenerEscuela(
-            user.escuelaId
-          );
-          if (escuelaData) {
-            setEscuela(escuelaData);
-          }
-        }
-
-        // Cargar estadísticas del dashboard
-        const stats = await dashboardService.obtenerEstadisticas();
-        setEstadisticas(stats);
-      } catch (error) {
-        console.error("Error cargando dashboard:", error);
-        // Mantener valores por defecto en caso de error
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (user) {
-      cargarDashboard();
-    }
-  }, [user]);
+  };
 
   
   if (loading) {
@@ -182,7 +155,7 @@ const Dashboard = () => {
                   Mensajes sin leer
                 </Typography>
                 <Typography variant="h2" sx={{ fontWeight: "bold", my: 2 }}>
-                  {estadisticas.mensajesSinLeer}
+                  {stats.mensajesSinLeer}
                 </Typography>
               </Box>
               <Button
@@ -196,7 +169,7 @@ const Dashboard = () => {
                     bgcolor: "rgba(255,255,255,0.3)",
                   },
                 }}
-                onClick={() => (window.location.href = "/mensajes")}
+                onClick={() => navigate("/mensajes")}
                 fullWidth
               >
                 Ver todos
@@ -237,7 +210,7 @@ const Dashboard = () => {
                   Eventos Próximos
                 </Typography>
                 <Typography variant="h2" sx={{ fontWeight: "bold", my: 2 }}>
-                  {estadisticas.eventosProximos}
+                  {stats.eventosProximos}
                 </Typography>
               </Box>
               <Button
@@ -251,7 +224,7 @@ const Dashboard = () => {
                     bgcolor: "#1565c0",
                   },
                 }}
-                onClick={() => (window.location.href = "/calendario")}
+                onClick={() => navigate("/calendario")}
                 fullWidth
               >
                 Ver calendario
@@ -292,7 +265,7 @@ const Dashboard = () => {
                   Anuncios Recientes
                 </Typography>
                 <Typography variant="h2" sx={{ fontWeight: "bold", my: 2 }}>
-                  {estadisticas.anunciosRecientes}
+                  {stats.anunciosRecientes}
                 </Typography>
               </Box>
               <Button
@@ -306,7 +279,7 @@ const Dashboard = () => {
                     bgcolor: "#f57c00",
                   },
                 }}
-                onClick={() => (window.location.href = "/anuncios")}
+                onClick={() => navigate("/anuncios")}
                 fullWidth
               >
                 Ver anuncios

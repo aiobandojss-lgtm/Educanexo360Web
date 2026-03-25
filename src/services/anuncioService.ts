@@ -86,7 +86,7 @@ const anuncioService = {
    * Obtener URL de un archivo adjunto
    */
   obtenerUrlAdjunto: (anuncioId: string, archivoId: string) => {
-    const baseUrl = process.env.REACT_APP_API_URL || "";
+    const baseUrl = import.meta.env.VITE_API_URL || "";
     return `${baseUrl}/api/anuncios/${anuncioId}/adjunto/${archivoId}`;
   },
   /**

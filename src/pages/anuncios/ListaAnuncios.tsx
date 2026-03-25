@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import {
   Box,
   Button,
@@ -23,15 +23,11 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
-import anuncioService from "../../services/anuncioService";
 import { Anuncio, AnuncioFilters } from "../../types/anuncio.types";
 import useAuth from "../../hooks/useAuth";
+import { useAnunciosFiltrados } from "../../hooks/useAppQueries";
 
 const ListaAnuncios: React.FC = () => {
-  const [anuncios, setAnuncios] = useState<Anuncio[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const [totalPaginas, setTotalPaginas] = useState<number>(1);
   const [filtros, setFiltros] = useState<AnuncioFilters>({
     pagina: 1,
     limite: 10,
@@ -44,41 +40,23 @@ const ListaAnuncios: React.FC = () => {
   // Determinar si el usuario puede crear/editar anuncios
   const puedeCrearAnuncios = user?.tipo === "ADMIN" || user?.tipo === "DOCENTE";
 
-  useEffect(() => {
-    cargarAnuncios();
-  }, [filtros]);
+  // Parámetros construidos reactivamente — cuando filtros cambia, react-query refetchea
+  const params = useMemo(() => {
+    const p: Record<string, unknown> = {
+      pagina: filtros.pagina || 1,
+      limite: filtros.limite || 10,
+      soloDestacados: filtros.soloDestacados,
+      busqueda: filtros.busqueda,
+    };
+    if (!puedeCrearAnuncios) p.soloPublicados = true;
+    return p;
+  }, [filtros, puedeCrearAnuncios]);
 
-  const cargarAnuncios = async () => {
-    try {
-      setLoading(true);
-      setError(null);
+  const { data: response, isLoading: loading, isError } = useAnunciosFiltrados(params);
 
-      // Construir los parámetros base
-      const params: any = {
-        pagina: filtros.pagina || 1,
-        limite: filtros.limite || 10,
-        soloDestacados: filtros.soloDestacados,
-        busqueda: filtros.busqueda,
-      };
-
-      // Para estudiantes y padres, solo mostrar anuncios publicados
-      // Para admin y docentes, mostrar todos los anuncios
-      if (!puedeCrearAnuncios) {
-        params.soloPublicados = true;
-      }
-
-      console.log("Parámetros enviados:", params);
-
-      const response = await anuncioService.listarAnuncios(params);
-      setAnuncios(response.data);
-      setTotalPaginas(response.meta.paginas);
-      setLoading(false);
-    } catch (err) {
-      console.error("Error al cargar anuncios:", err);
-      setError("No se pudieron cargar los anuncios. Intente nuevamente.");
-      setLoading(false);
-    }
-  };
+  const anuncios: Anuncio[] = response?.data ?? [];
+  const totalPaginas: number = response?.meta?.paginas ?? 1;
+  const error = isError ? "No se pudieron cargar los anuncios. Intente nuevamente." : null;
 
   const handlePageChange = (
     event: React.ChangeEvent<unknown>,

@@ -2,18 +2,20 @@
 import axios from "axios";
 import { getToken, refreshToken, logout } from "../services/authService";
 
-// INICIO DE DIAGNÓSTICO
-console.log("==================== DIAGNÓSTICO AXIOS ====================");
-console.log(
-  "BaseURL configurada:",
-  process.env.REACT_APP_API_URL || "http://localhost:3000"
-);
-console.log("Ambiente:", process.env.NODE_ENV);
-console.log("============================================================");
-// FIN DE DIAGNÓSTICO
+const isDev = import.meta.env.MODE === "development";
+
+// Solo mostrar diagnóstico en desarrollo
+if (isDev) {
+  console.log("==================== DIAGNÓSTICO AXIOS ====================");
+  console.log(
+    "BaseURL configurada:",
+    import.meta.env.VITE_API_URL || "http://localhost:3000"
+  );
+  console.log("Ambiente:", import.meta.env.MODE);
+  console.log("============================================================");
+}
 
 // Función para asegurarse de que todas las URLs tengan el prefijo /api/
-// NOTA: Esta función puede ser parte del problema - la dejamos por ahora pero con diagnóstico adicional
 export const ensureApiPrefix = (url: string): string => {
   const originalUrl = url;
 
@@ -28,42 +30,44 @@ export const ensureApiPrefix = (url: string): string => {
     url = `/api/${url}`;
   }
 
-  // Log para diagnóstico de transformación de URL
-  console.log(`URL transformada: ${originalUrl} -> ${url}`);
+  // Log de transformación solo en desarrollo
+  if (isDev) {
+    console.log(`URL transformada: ${originalUrl} -> ${url}`);
+  }
 
   return url;
 };
 
 // Crear una instancia de axios con la configuración base
 const axiosInstance = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || "http://localhost:3000", // Asegúrate de que este puerto coincida con el del backend
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:3000",
   headers: {
     "Content-Type": "application/json",
   },
-  timeout: 30000, // Aumentado a 30 segundos para operaciones más lentas como carga de archivos
+  timeout: 30000, // 30 segundos para operaciones más lentas como carga de archivos
 });
 
 // Crear una instancia específica para carga de archivos con timeout más largo
 export const axiosFileInstance = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || "http://localhost:3000",
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:3000",
   timeout: 60000, // 60 segundos para subidas de archivos
 });
 
-// Interceptor para añadir el token de autenticación a las solicitudes y asegurar el prefijo /api/
+// Interceptor para añadir el token de autenticación y asegurar el prefijo /api/
 axiosInstance.interceptors.request.use(
   (config) => {
-    // Log antes de la transformación
-    console.log(
-      `📤 Solicitud original: ${config.method?.toUpperCase()} ${config.url}`
-    );
+    if (isDev) {
+      console.log(
+        `📤 Solicitud original: ${config.method?.toUpperCase()} ${config.url}`
+      );
+    }
 
     // Asegurarse de que todas las URLs tienen el prefijo /api/
     if (config.url && !config.url.includes("http")) {
       const originalUrl = config.url;
       config.url = ensureApiPrefix(config.url);
 
-      // Si la URL fue modificada, registrarlo
-      if (originalUrl !== config.url) {
+      if (isDev && originalUrl !== config.url) {
         console.log(`URL modificada: ${originalUrl} -> ${config.url}`);
       }
     }
@@ -74,40 +78,27 @@ axiosInstance.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    // Log después de todas las transformaciones
-    console.log(
-      `📤 Solicitud final: ${config.method?.toUpperCase()} ${config.baseURL}${
-        config.url
-      }`,
-      {
-        params: config.params,
-        data: config.data ? "(datos presentes)" : "(sin datos)",
-      }
-    );
+    if (isDev) {
+      console.log(
+        `📤 Solicitud final: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`,
+        {
+          params: config.params,
+          data: config.data ? "(datos presentes)" : "(sin datos)",
+        }
+      );
+    }
 
     return config;
   },
   (error) => {
-    console.error("❌ Error al preparar solicitud:", error);
+    if (isDev) console.error("❌ Error al preparar solicitud:", error);
     return Promise.reject(error);
   }
 );
 
-axiosInstance.interceptors.request.use((config) => {
-  // Añadir timestamp único a peticiones GET para evitar caché
-  if (config.method?.toLowerCase() === "get") {
-    config.params = {
-      ...config.params,
-      _t: new Date().getTime(), // Parámetro único para cada petición
-    };
-  }
-  return config;
-});
-
 // Aplicar el mismo interceptor a la instancia para archivos
 axiosFileInstance.interceptors.request.use(
   (config) => {
-    // Configuración para asegurar que Content-Type sea eliminado (el navegador lo establece automáticamente con boundary)
     if (config.url && !config.url.includes("http")) {
       config.url = ensureApiPrefix(config.url);
     }
@@ -129,36 +120,37 @@ axiosFileInstance.interceptors.request.use(
   }
 );
 
-// Mejorar el interceptor de respuesta con más información de debugging
+// Interceptor de respuesta con logging solo en desarrollo
 axiosInstance.interceptors.response.use(
   (response) => {
-    // Log para respuestas exitosas
-    console.log(
-      `📥 Respuesta (${response.status}) de ${response.config.url}:`,
-      {
-        url: response.config.url,
-        método: response.config.method,
-        código: response.status,
-        tieneData: !!response.data,
-        estructuraDatos: response.data
-          ? Object.keys(response.data)
-          : "sin datos",
-      }
-    );
-
-    // Si la respuesta tiene estructura de paginación, mostrarla
-    if (
-      response.data &&
-      response.data.data &&
-      (response.data.data.invitaciones || response.data.data.solicitudes)
-    ) {
-      const items =
-        response.data.data.invitaciones || response.data.data.solicitudes;
+    if (isDev) {
       console.log(
-        `Paginación: ${items?.length || 0} items, total: ${
-          response.data.data.total || 0
-        }`
+        `📥 Respuesta (${response.status}) de ${response.config.url}:`,
+        {
+          url: response.config.url,
+          método: response.config.method,
+          código: response.status,
+          tieneData: !!response.data,
+          estructuraDatos: response.data
+            ? Object.keys(response.data)
+            : "sin datos",
+        }
       );
+
+      // Si la respuesta tiene estructura de paginación, mostrarla
+      if (
+        response.data &&
+        response.data.data &&
+        (response.data.data.invitaciones || response.data.data.solicitudes)
+      ) {
+        const items =
+          response.data.data.invitaciones || response.data.data.solicitudes;
+        console.log(
+          `Paginación: ${items?.length || 0} items, total: ${
+            response.data.data.total || 0
+          }`
+        );
+      }
     }
 
     return response;
@@ -166,69 +158,60 @@ axiosInstance.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // Log mejorado para debugging
-    if (error.response) {
-      console.error(
-        `❌ Error ${error.response.status} en ${
-          originalRequest?.url || "URL desconocida"
-        }:`,
-        {
-          data: error.response.data,
-          headers: error.response.headers,
-          config: {
-            url: originalRequest?.url,
-            method: originalRequest?.method,
-            baseURL: originalRequest?.baseURL,
-            params: originalRequest?.params,
-          },
-        }
-      );
+    // Log de errores solo en desarrollo
+    if (isDev) {
+      if (error.response) {
+        console.error(
+          `❌ Error ${error.response.status} en ${
+            originalRequest?.url || "URL desconocida"
+          }:`,
+          {
+            data: error.response.data,
+            config: {
+              url: originalRequest?.url,
+              method: originalRequest?.method,
+              params: originalRequest?.params,
+            },
+          }
+        );
 
-      if (error.response.status === 404) {
-        console.error(`URL no encontrada: ${originalRequest.url}`);
-        console.error(`Prueba estas alternativas:`);
-
-        if (originalRequest.url.startsWith("/api/")) {
-          console.error(`- ${originalRequest.url.substring(4)} (sin /api)`);
-        } else {
-          console.error(`- /api${originalRequest.url} (con /api)`);
+        if (error.response.status === 404) {
+          console.error(`URL no encontrada: ${originalRequest.url}`);
+          if (originalRequest.url.startsWith("/api/")) {
+            console.error(`- ${originalRequest.url.substring(4)} (sin /api)`);
+          } else {
+            console.error(`- /api${originalRequest.url} (con /api)`);
+          }
         }
+      } else if (error.request) {
+        console.error("❌ No se recibió respuesta del servidor:", error.request);
+      } else {
+        console.error("❌ Error al configurar la solicitud:", error.message);
       }
-    } else if (error.request) {
-      console.error("❌ No se recibió respuesta del servidor:", error.request);
-    } else {
-      console.error("❌ Error al configurar la solicitud:", error.message);
     }
 
-    // Si el error es 401 (No autorizado) y no es un intento de refresh
+    // Si el error es 401 y no es un intento de refresh
     if (
       error.response?.status === 401 &&
       !originalRequest._retry &&
       originalRequest.url !== "/api/auth/refresh-token" &&
-      originalRequest.url !== "/api/auth/verify-token" // No intentar refresh token si es la verificación de token
+      originalRequest.url !== "/api/auth/verify-token"
     ) {
       originalRequest._retry = true;
-      console.log(
-        "Intentando renovar token para solicitud:",
-        originalRequest.url
-      );
+      if (isDev) {
+        console.log("Intentando renovar token para solicitud:", originalRequest.url);
+      }
 
       try {
-        // Intentar renovar el token
         const newToken = await refreshToken();
 
         if (newToken) {
-          console.log(
-            "Token renovado exitosamente, reintentando solicitud original"
-          );
-          // Actualizar el token en la solicitud original y reintentarla
+          if (isDev) console.log("Token renovado exitosamente, reintentando solicitud original");
           originalRequest.headers.Authorization = `Bearer ${newToken}`;
           return axiosInstance(originalRequest);
         } else {
-          console.log("No se pudo renovar el token, forzando logout");
-          // Si no se pudo renovar el token, cerrar sesión
+          if (isDev) console.log("No se pudo renovar el token, forzando logout");
           logout();
-          // En lugar de redirigir con window.location, retornamos un objeto con info para que el componente decida
           return Promise.reject({
             ...error,
             sessionExpired: true,
@@ -237,8 +220,7 @@ axiosInstance.interceptors.response.use(
           });
         }
       } catch (refreshError) {
-        console.error("Error al renovar token:", refreshError);
-        // Si hay un error al renovar el token, cerrar sesión
+        if (isDev) console.error("Error al renovar token:", refreshError);
         logout();
         return Promise.reject({
           ...error,
@@ -253,27 +235,24 @@ axiosInstance.interceptors.response.use(
   }
 );
 
-// Aplicar el mismo interceptor de respuesta a la instancia para archivos
+// Interceptor de respuesta para la instancia de archivos
 axiosFileInstance.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
-    // Si el error es 401 (No autorizado) y no es un intento de refresh
     if (
       error.response?.status === 401 &&
       !originalRequest._retry &&
       originalRequest.url !== "/api/auth/refresh-token" &&
-      originalRequest.url !== "/api/auth/verify-token" // Misma exclusión aquí
+      originalRequest.url !== "/api/auth/verify-token"
     ) {
       originalRequest._retry = true;
 
       try {
-        // Intentar renovar el token
         const newToken = await refreshToken();
 
         if (newToken) {
-          // Actualizar el token en la solicitud original y reintentarla
           originalRequest.headers.Authorization = `Bearer ${newToken}`;
           return axiosFileInstance(originalRequest);
         } else {

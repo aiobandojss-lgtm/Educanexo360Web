@@ -146,7 +146,7 @@ const tareaService = {
     archivoId: string,
     tipo: "referencia" | "entrega" = "referencia"
   ) => {
-    const baseUrl = process.env.REACT_APP_API_URL || "";
+    const baseUrl = import.meta.env.VITE_API_URL || "";
     return `${baseUrl}${API_ROUTES.TAREAS.DESCARGAR_ARCHIVO(
       tareaId,
       archivoId

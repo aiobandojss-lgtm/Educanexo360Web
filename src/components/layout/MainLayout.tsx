@@ -29,6 +29,7 @@ import {
 } from "@mui/icons-material";
 import NavigationMenu from "./NavigationMenu";
 import { logout } from "../../redux/slices/authSlice";
+import { logout as authLogout } from "../../services/authService";
 import { RootState } from "../../redux/store";
 
 // Función para obtener la etiqueta correcta del rol de usuario
@@ -104,7 +105,8 @@ const MainLayout: React.FC = () => {
 
   const handleLogout = () => {
     handleUserMenuClose();
-    dispatch(logout());
+    authLogout(); // Limpia localStorage (tokens, userProfile)
+    dispatch(logout()); // Limpia Redux state
     navigate("/login");
   };
 

@@ -23,7 +23,7 @@ import {
   register as registerService,
   hasPermission as checkPermission,
 } from '../services/authService';
-import { ensureUserHasState } from '../types/user.types';
+import { ensureUserHasState, UserRegister } from '../types/user.types';
 import { RootState } from '../redux/store';
 
 /**
@@ -55,8 +55,8 @@ const useAuth = () => {
       dispatch(loginSuccess(ensureUserHasState(user)));
       navigate('/');
       return true;
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.message || 'Error al iniciar sesión';
+    } catch (err: unknown) {
+      const errorMessage = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Error al iniciar sesión';
       dispatch(loginFailure(errorMessage));
       return false;
     }
@@ -74,14 +74,14 @@ const useAuth = () => {
   /**
    * Registrar nuevo usuario
    */
-  const register = async (userData: any) => {
+  const register = async (userData: UserRegister) => {
     try {
       dispatch(registerStart());
       const { user } = await registerService(userData);
       dispatch(registerSuccess(ensureUserHasState(user)));
       return true;
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.message || 'Error al registrarse';
+    } catch (err: unknown) {
+      const errorMessage = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Error al registrarse';
       dispatch(registerFailure(errorMessage));
       return false;
     }

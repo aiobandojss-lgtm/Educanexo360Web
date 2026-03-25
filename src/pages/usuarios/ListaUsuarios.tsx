@@ -1,6 +1,9 @@
 // src/pages/usuarios/ListaUsuarios.tsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
+import { useUsuarios, QUERY_KEYS } from '../../hooks/useAppQueries';
+import usuarioService from '../../services/usuarioService';
 import {
   Box,
   Typography,
@@ -40,23 +43,20 @@ interface Usuario {
 
 const ListaUsuarios: React.FC = () => {
   const navigate = useNavigate();
-  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const queryClient = useQueryClient();
+
+  const { data: usuarios = [], isLoading: loading, isError } = useUsuarios();
   const [filteredUsuarios, setFilteredUsuarios] = useState<Usuario[]>([]);
   const [busqueda, setBusqueda] = useState<string>('');
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+
+  const error = isError ? 'Error al cargar la lista de usuarios. Intente nuevamente más tarde.' : null;
 
   useEffect(() => {
-    cargarUsuarios();
-  }, []);
-
-  useEffect(() => {
-    // Filtramos usuarios cuando cambie la búsqueda
     if (busqueda.trim() === '') {
-      setFilteredUsuarios(usuarios);
+      setFilteredUsuarios(usuarios as Usuario[]);
     } else {
       const searchTermLower = busqueda.toLowerCase();
-      const filtered = usuarios.filter(
+      const filtered = (usuarios as Usuario[]).filter(
         (usuario) =>
           usuario.nombre.toLowerCase().includes(searchTermLower) ||
           usuario.apellidos.toLowerCase().includes(searchTermLower) ||
@@ -66,24 +66,6 @@ const ListaUsuarios: React.FC = () => {
       setFilteredUsuarios(filtered);
     }
   }, [busqueda, usuarios]);
-
-  const cargarUsuarios = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const response = await axiosInstance.get('/usuarios');
-      const data = response.data.data || [];
-      
-      setUsuarios(data);
-      setFilteredUsuarios(data);
-    } catch (err) {
-      console.error('Error al cargar usuarios:', err);
-      setError('Error al cargar la lista de usuarios. Intente nuevamente más tarde.');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSearch = () => {
     // La búsqueda ya se aplica automáticamente por el efecto
@@ -108,12 +90,10 @@ const ListaUsuarios: React.FC = () => {
   const handleEliminarUsuario = async (id: string) => {
     if (window.confirm('¿Está seguro de desactivar este usuario?')) {
       try {
-        await axiosInstance.delete(`/usuarios/${id}`);
-        // Recargar la lista después de eliminar
-        cargarUsuarios();
+        await usuarioService.eliminarUsuario(id);
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.USUARIOS() });
       } catch (err) {
         console.error('Error al eliminar usuario:', err);
-        setError('Error al desactivar usuario. Intente nuevamente más tarde.');
       }
     }
   };

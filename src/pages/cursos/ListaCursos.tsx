@@ -1,6 +1,8 @@
 // src/pages/cursos/ListaCursos.tsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
+import { useCursos, QUERY_KEYS } from '../../hooks/useAppQueries';
 import {
   Box,
   Typography,
@@ -31,6 +33,7 @@ import {
   Close as CloseIcon,
 } from '@mui/icons-material';
 import axiosInstance from '../../api/axiosConfig';
+import cursoService from '../../services/cursoService';
 
 // Función de utilidad para extraer el nombre del usuario de forma segura
 const extractUserName = (user: any): string => {
@@ -112,25 +115,22 @@ interface Curso {
 
 const ListaCursos: React.FC = () => {
   const navigate = useNavigate();
-  const [cursos, setCursos] = useState<Curso[]>([]);
+  const queryClient = useQueryClient();
+
+  // Caché inteligente: segunda visita es instantánea
+  const { data: cursos = [], isLoading: loading, isError } = useCursos();
   const [filteredCursos, setFilteredCursos] = useState<Curso[]>([]);
   const [busqueda, setBusqueda] = useState<string>('');
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const [networkError, setNetworkError] = useState<boolean>(false);
-  const [demoMode, setDemoMode] = useState<boolean>(false);
+
+  const error = isError ? 'Error al cargar la lista de cursos. Intente nuevamente más tarde.' : null;
 
   useEffect(() => {
-    cargarCursos();
-  }, []);
-
-  useEffect(() => {
-    // Filtrar cursos cuando cambia la búsqueda
+    // Filtrar cursos cuando cambia la búsqueda o los datos del caché
     if (busqueda.trim() === '') {
-      setFilteredCursos(cursos);
+      setFilteredCursos(cursos as Curso[]);
     } else {
       const searchTermLower = busqueda.toLowerCase();
-      const filtered = cursos.filter(
+      const filtered = (cursos as Curso[]).filter(
         (curso) =>
           curso.nombre.toLowerCase().includes(searchTermLower) ||
           curso.nivel.toLowerCase().includes(searchTermLower) ||
@@ -140,91 +140,6 @@ const ListaCursos: React.FC = () => {
       setFilteredCursos(filtered);
     }
   }, [busqueda, cursos]);
-
-  const cargarCursos = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      setNetworkError(false);
-      
-      try {
-        const response = await axiosInstance.get('/cursos');
-        console.log('Respuesta de API cursos:', response.data);
-        setCursos(response.data.data || []);
-        setFilteredCursos(response.data.data || []);
-        setDemoMode(false);
-      } catch (err: any) {
-        console.error('Error al cargar cursos:', err);
-        
-        // Detectar error de conexión
-        if (err.message && err.message.includes('Network Error')) {
-          setNetworkError(true);
-          setDemoMode(true);
-          
-          // Proporcionar datos de demostración
-          const demoData: Curso[] = [
-            {
-              _id: '1',
-              nombre: 'Primero A',
-              nivel: 'PRIMARIA',
-              año_academico: '2023-2024',
-              capacidad: 30,
-              estudiantes: [],
-              director_grupo: { nombre: 'María', apellidos: 'López' },
-              estado: 'ACTIVO',
-            },
-            {
-              _id: '2',
-              nombre: 'Segundo B',
-              nivel: 'PRIMARIA',
-              año_academico: '2023-2024',
-              capacidad: 25,
-              estudiantes: [],
-              director_grupo: { nombre: 'Juan', apellidos: 'González' },
-              estado: 'ACTIVO',
-            },
-            {
-              _id: '3',
-              nombre: 'Tercero C',
-              nivel: 'PRIMARIA',
-              año_academico: '2023-2024',
-              capacidad: 28,
-              estudiantes: [],
-              director_grupo: { nombre: 'Carlos', apellidos: 'Rodríguez' },
-              estado: 'ACTIVO',
-            },
-            {
-              _id: '4',
-              nombre: 'Noveno A',
-              nivel: 'SECUNDARIA',
-              año_academico: '2023-2024',
-              capacidad: 35,
-              estudiantes: [],
-              director_grupo: { nombre: 'Ana', apellidos: 'Martínez' },
-              estado: 'ACTIVO',
-            },
-            {
-              _id: '5',
-              nombre: 'Décimo B',
-              nivel: 'MEDIA',
-              año_academico: '2023-2024',
-              capacidad: 32,
-              estudiantes: [],
-              director_grupo: { nombre: 'Pedro', apellidos: 'Sánchez' },
-              estado: 'ACTIVO',
-            },
-          ];
-          
-          setCursos(demoData);
-          setFilteredCursos(demoData);
-        } else {
-          setError('Error al cargar la lista de cursos. Intente nuevamente más tarde.');
-        }
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSearch = () => {
     console.log("Buscando cursos con término:", busqueda);
@@ -247,19 +162,11 @@ const ListaCursos: React.FC = () => {
   const handleEliminarCurso = async (id: string) => {
     if (window.confirm('¿Está seguro de desactivar este curso?')) {
       try {
-        if (demoMode) {
-          setCursos(prev => 
-            prev.map(curso => 
-              curso._id === id ? { ...curso, estado: 'INACTIVO' } : curso
-            )
-          );
-        } else {
-          await axiosInstance.delete(`/cursos/${id}`);
-          cargarCursos();
-        }
+        await cursoService.eliminarCurso(id);
+        // Invalida el caché para que react-query refetchee la lista actualizada
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CURSOS });
       } catch (err) {
         console.error('Error al eliminar curso:', err);
-        setError('Error al desactivar curso. Intente nuevamente más tarde.');
       }
     }
   };
@@ -282,9 +189,7 @@ const ListaCursos: React.FC = () => {
     }
   };
 
-  const handleCloseNetworkError = () => {
-    setNetworkError(false);
-  };
+  const handleCloseNetworkError = () => {};
 
   // Función para contar estudiantes en un curso
   const contarEstudiantes = (curso: Curso): number => {
@@ -298,11 +203,6 @@ const ListaCursos: React.FC = () => {
           <Typography variant="h1" color="primary.main">
             Administración de Cursos
           </Typography>
-          {demoMode && (
-            <Typography variant="subtitle1" color="text.secondary">
-              Modo demostración - Sin conexión al servidor
-            </Typography>
-          )}
         </Grid>
         <Grid item>
           <Button
@@ -504,10 +404,10 @@ const ListaCursos: React.FC = () => {
       </TableContainer>
 
       <Snackbar
-        open={networkError}
+        open={false}
         autoHideDuration={6000}
         onClose={handleCloseNetworkError}
-        message="Error de conexión con el servidor. Funcionando en modo demo."
+        message="Error de conexión con el servidor."
         action={
           <IconButton
             size="small"

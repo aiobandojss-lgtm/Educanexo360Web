@@ -2,7 +2,20 @@
 import React, { useEffect } from "react";
 import { BrowserRouter } from "react-router-dom";
 import { Provider, useDispatch } from "react-redux";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { store } from "./redux/store";
+
+// Cliente global de @tanstack/react-query v5 con caché inteligente
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 2,   // Datos frescos por 2 minutos
+      gcTime: 1000 * 60 * 10,     // Garbage collection tras 10 min sin uso (antes: cacheTime)
+      retry: 1,                    // Solo 1 reintento en caso de error
+      refetchOnWindowFocus: false, // No re-fetchar al volver al tab
+    },
+  },
+});
 import { ThemeProvider } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
 import AppRoutes from "./routes/AppRoutes";
@@ -16,6 +29,7 @@ import { ensureUserHasState } from "./types/user.types";
 import theme from "./theme/theme";
 import { performanceMonitor } from "./utils/performanceUtils";
 import SystemInitializationCheck from "./components/system/SystemInitializationCheck"; // Importamos el componente
+import ErrorBoundary from "./components/common/ErrorBoundary";
 
 // Importar fuente Roboto de Google Fonts
 import "@fontsource/roboto/300.css";
@@ -72,7 +86,7 @@ const AuthInitializer = () => {
 function App() {
   useEffect(() => {
     // Iniciar monitoreo de rendimiento global
-    performanceMonitor.setEnabled(process.env.NODE_ENV === "development");
+    performanceMonitor.setEnabled(import.meta.env.MODE === "development");
 
     // Configurar atributos de accesibilidad a nivel de documento
     document.documentElement.lang = "es";
@@ -102,6 +116,7 @@ function App() {
 
   return (
     <Provider store={store}>
+      <QueryClientProvider client={queryClient}>
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <BrowserRouter>
@@ -109,6 +124,7 @@ function App() {
           <AuthInitializer />
 
           {/* Verificación de inicialización del sistema */}
+          <ErrorBoundary>
           <SystemInitializationCheck>
             {/* Contexto de anuncios para lectores de pantalla */}
             <div
@@ -124,6 +140,7 @@ function App() {
 
             <AppRoutes />
           </SystemInitializationCheck>
+          </ErrorBoundary>
         </BrowserRouter>
       </ThemeProvider>
 
@@ -156,6 +173,7 @@ function App() {
           }
         `}
       </style>
+      </QueryClientProvider>
     </Provider>
   );
 }

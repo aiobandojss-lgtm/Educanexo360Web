@@ -1,6 +1,6 @@
 // src/components/layout/AccessibleMainLayout.tsx
 import React, { useEffect } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import {
   Box,
@@ -39,6 +39,7 @@ const drawerWidth = 260;
 
 const AccessibleMainLayout = () => {
   const { user } = useSelector((state: RootState) => state.auth);
+  const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const [mobileOpen, setMobileOpen] = React.useState(false);
@@ -86,7 +87,7 @@ const AccessibleMainLayout = () => {
 
   const handleLogout = () => {
     logout();
-    window.location.href = "/login";
+    navigate("/login");
   };
 
   const skipToMainProps = getSkipLinkProps(

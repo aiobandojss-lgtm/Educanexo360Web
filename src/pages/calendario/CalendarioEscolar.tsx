@@ -59,6 +59,8 @@ import {
 } from "../../utils/permissionTester";
 import EventoActionButtons from "../../components/calendario/EventoActionButtons";
 import { eventOccursOnDate, formatDate } from "../../utils/dateUtils";
+import { useEventosMes, QUERY_KEYS } from "../../hooks/useAppQueries";
+import { useQueryClient } from "@tanstack/react-query";
 
 const isEventPassed = (evento: IEvento): boolean => {
   const now = new Date();
@@ -346,19 +348,29 @@ const EventoDetalle = ({
 const CalendarioEscolar = () => {
   const navigate = useNavigate();
   const { user } = useSelector((state: RootState) => state.auth);
+  const queryClient = useQueryClient();
 
   const [month, setMonth] = useState<number>(new Date().getMonth());
   const [year, setYear] = useState<number>(new Date().getFullYear());
-  const [events, setEvents] = useState<IEvento[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
   const [filtroTipo, setFiltroTipo] = useState<string>("");
+  const [filtroEstado, setFiltroEstado] = useState<string>("ACTIVO");
 
-  // 🚨 FILTRO SIMPLE Y CLARO
-  const [filtroEstado, setFiltroEstado] = useState<string>(() => {
-    // TODOS los usuarios por defecto ven solo ACTIVOS
-    return "ACTIVO";
+  // Caché por mes/año/filtros — navegación entre meses es instantánea si ya se visitó
+  const {
+    data: events = [],
+    isLoading: loading,
+    isError,
+    refetch: refetchEventos,
+  } = useEventosMes(month, year, {
+    tipo: filtroTipo || undefined,
+    estado: filtroEstado || undefined,
   });
+
+  const error = isError ? "No se pudieron cargar los eventos." : null;
+
+  // Estado local solo para operaciones de escritura (cancelar, confirmar asistencia)
+  const [actionLoading, setLoading] = useState<boolean>(false);
+  const [actionError, setError] = useState<string | null>(null);
 
   const [eventosDelDia, setEventosDelDia] = useState<IEvento[]>([]);
   const [diaSeleccionado, setDiaSeleccionado] = useState<number | null>(null);
@@ -406,68 +418,6 @@ const CalendarioEscolar = () => {
     logCurrentUser();
   }, []);
 
-  useEffect(() => {
-    const fetchEvents = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const startDate = new Date(year, month, 1);
-        const endDate = new Date(year, month + 1, 0);
-
-        // 🚨 EL FILTRADO AHORA SE MANEJA AUTOMÁTICAMENTE EN EL SERVICIO
-        // 🚨 LÓGICA SIMPLIFICADA - TODOS USAN EL MISMO SERVICIO
-        try {
-          console.log("🔍 Solicitando eventos con estado:", filtroEstado);
-
-          const eventos = await calendarioService.obtenerEventos({
-            inicio: startDate.toISOString(),
-            fin: endDate.toISOString(),
-            ...(filtroTipo && { tipo: filtroTipo }),
-            estado: filtroEstado, // Siempre enviar el estado seleccionado
-          });
-
-          console.log(`✅ Eventos recibidos: ${eventos.length}`);
-          setEvents(eventos);
-        } catch (normalError) {
-          console.error("Error al obtener eventos:", normalError);
-          // Fallback solo para estudiantes/padres
-          if (
-            user?.tipo === "ESTUDIANTE" ||
-            user?.tipo === "PADRE" ||
-            user?.tipo === "ACUDIENTE"
-          ) {
-            try {
-              const eventosDirectos = await getCalendarioEventosDirecto();
-              const eventosFiltrados = eventosDirectos.filter((evento) => {
-                const fechaEvento = new Date(evento.fechaInicio);
-                const enRangoFecha =
-                  fechaEvento >= startDate && fechaEvento <= endDate;
-                const coincideTipo = !filtroTipo || evento.tipo === filtroTipo;
-                const estadoActivo = evento.estado === "ACTIVO";
-                return enRangoFecha && coincideTipo && estadoActivo;
-              });
-              setEvents(eventosFiltrados);
-            } catch (fallbackError) {
-              setError("No se pudieron cargar los eventos.");
-              setEvents([]);
-            }
-          } else {
-            setError("No se pudieron cargar los eventos.");
-            setEvents([]);
-          }
-        }
-      } catch (err) {
-        console.error("Error al cargar eventos:", err);
-        setError("No se pudieron cargar los eventos.");
-        setEvents([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchEvents();
-  }, [month, year, filtroTipo, filtroEstado, success, user?.tipo]);
 
   const getTypeIcon = (type: string) => {
     switch (type) {
@@ -594,28 +544,13 @@ const CalendarioEscolar = () => {
 
       console.log("9. ✅ Respuesta del servicio:", resultado);
 
-      // Actualizar estado local
-      console.log("12. Actualizando estado local...");
+      // Invalida el caché para que react-query refetchee el mes actual
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.EVENTOS });
 
-      const eventosAnteriores = events.length;
-      setEvents((prevEvents) => {
-        const nuevosEventos = prevEvents.filter((e) => e._id !== eventoId);
-        console.log(
-          `13. Eventos actualizados: ${prevEvents.length} -> ${nuevosEventos.length}`
-        );
-        return nuevosEventos;
-      });
-
-      const eventosDelDiaAnteriores = eventosDelDia.length;
-      setEventosDelDia((prevEventos) => {
-        const nuevosEventos = prevEventos.filter((e) => e._id !== eventoId);
-        console.log(
-          `14. Eventos del día actualizados: ${prevEventos.length} -> ${nuevosEventos.length}`
-        );
-        return nuevosEventos;
-      });
-
-      console.log("15. ✅ Estados actualizados correctamente");
+      // Actualizar eventos del día en estado local
+      setEventosDelDia((prevEventos) =>
+        prevEventos.filter((e) => e._id !== eventoId)
+      );
 
       setSuccess("✅ Evento cancelado exitosamente");
 
