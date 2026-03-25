@@ -28,7 +28,6 @@ import { loginSuccess, logout } from "./redux/slices/authSlice";
 import { ensureUserHasState } from "./types/user.types";
 import theme from "./theme/theme";
 import { performanceMonitor } from "./utils/performanceUtils";
-import SystemInitializationCheck from "./components/system/SystemInitializationCheck"; // Importamos el componente
 import ErrorBoundary from "./components/common/ErrorBoundary";
 
 // Importar fuente Roboto de Google Fonts
@@ -123,23 +122,10 @@ function App() {
           {/* Inicializador de autenticación */}
           <AuthInitializer />
 
-          {/* Verificación de inicialización del sistema */}
           <ErrorBoundary>
-          <SystemInitializationCheck>
-            {/* Contexto de anuncios para lectores de pantalla */}
-            <div
-              aria-live="polite"
-              id="polite-announcer"
-              className="sr-only"
-            ></div>
-            <div
-              aria-live="assertive"
-              id="assertive-announcer"
-              className="sr-only"
-            ></div>
-
+            <div aria-live="polite" id="polite-announcer" className="sr-only"></div>
+            <div aria-live="assertive" id="assertive-announcer" className="sr-only"></div>
             <AppRoutes />
-          </SystemInitializationCheck>
           </ErrorBoundary>
         </BrowserRouter>
       </ThemeProvider>
