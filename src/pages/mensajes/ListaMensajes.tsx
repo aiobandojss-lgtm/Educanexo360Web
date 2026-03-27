@@ -1,6 +1,7 @@
 // src/pages/mensajes/ListaMensajes.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Box,
   Typography,
@@ -44,6 +45,7 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../../redux/store';
 import mensajeService from '../../services/mensajeService';
 import { ROLES_CON_BORRADORES } from '../../types/mensaje.types';
+import { useMensajes } from '../../hooks/useAppQueries';
 
 // Definición de interfaces para los tipos
 interface Usuario {
@@ -91,11 +93,9 @@ interface Mensaje {
 const ListaMensajes: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user } = useSelector((state: RootState) => state.auth);
-  
-  const [mensajes, setMensajes] = useState<Mensaje[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+
   const [snackbar, setSnackbar] = useState<{open: boolean, message: string, severity: 'success' | 'error'}>({
     open: false,
     message: '',
@@ -120,50 +120,20 @@ const ListaMensajes: React.FC = () => {
   const bandeja = getBandeja();
 
   // Verificar si el usuario tiene acceso a borradores
-  const puedeTenerBorradores = user && ROLES_CON_BORRADORES.includes(user.tipo);
+  const puedeTenerBorradores = !!(user && ROLES_CON_BORRADORES.includes(user.tipo));
 
-  // Verificar si la bandeja es implementada (ahora todas lo son)
-  const esImplementada = true;
+  const { data: queryData, isLoading: loading, error: queryError } = useMensajes(
+    bandeja,
+    user?._id || "",
+    puedeTenerBorradores
+  );
 
-  useEffect(() => {
-    if (esImplementada) {
-      cargarMensajes();
-    } else {
-      // Si la bandeja no está implementada, establecemos mensajes vacíos pero sin error
-      setMensajes([]);
-      setLoading(false);
-    }
-  }, [bandeja, esImplementada]);
+  const mensajes: Mensaje[] = (queryData?.data as Mensaje[]) || [];
+  const error = queryError ? "No se pudieron cargar los mensajes. Intente nuevamente más tarde." : null;
 
-  // En ListaMensajes.tsx
-// En ListaMensajes.tsx, actualizar la función cargarMensajes
-// En ListaMensajes.tsx, actualizar la función cargarMensajes
-
-// En ListaMensajes.tsx, actualiza la función cargarMensajes
-const cargarMensajes = async () => {
-  try {
-    setLoading(true);
-    setError(null);
-    
-    let response;
-    
-    // Manejar borradores con un endpoint específico
-    if (bandeja === 'borradores' && puedeTenerBorradores) {
-      response = await mensajeService.obtenerBorradores();
-    } else {
-      // Pasar el ID del usuario para el filtrado adicional
-      response = await mensajeService.obtenerMensajes(bandeja, 1, 20, user?._id);
-    }
-    
-    setMensajes(response.data || []);
-  } catch (err) {
-    console.error(`Error al cargar mensajes de ${bandeja}:`, err);
-    setError(`No se pudieron cargar los mensajes. Intente nuevamente más tarde.`);
-    setMensajes([]);
-  } finally {
-    setLoading(false);
-  }
-};
+  const invalidarMensajes = () => {
+    queryClient.invalidateQueries({ queryKey: ["mensajes"] });
+  };
 
   const handleVerMensaje = (id: string) => {
     // Si es un borrador, ir a la página de edición
@@ -187,7 +157,7 @@ const cargarMensajes = async () => {
       });
       
       // Actualizar la lista de mensajes
-      cargarMensajes();
+      invalidarMensajes();
     } catch (err) {
       console.error('Error al marcar mensaje:', err);
       
@@ -215,7 +185,7 @@ const cargarMensajes = async () => {
           severity: 'success'
         });
         // Actualizar la lista de mensajes
-        cargarMensajes();
+        invalidarMensajes();
       } else {
         // Si no está en la bandeja de eliminados, simplemente lo movemos a eliminados
         await mensajeService.eliminarMensaje(id);
@@ -225,7 +195,7 @@ const cargarMensajes = async () => {
           severity: 'success'
         });
         // Actualizar la lista de mensajes
-        cargarMensajes();
+        invalidarMensajes();
       }
     } catch (err) {
       console.error('Error al eliminar mensaje:', err);
@@ -250,7 +220,7 @@ const cargarMensajes = async () => {
         severity: 'success'
       });
       // Actualizar la lista de mensajes
-      cargarMensajes();
+      invalidarMensajes();
     } catch (err) {
       console.error('Error al eliminar definitivamente:', err);
       setSnackbar({
@@ -270,7 +240,7 @@ const cargarMensajes = async () => {
         severity: 'success'
       });
       // Actualizar la lista de mensajes
-      cargarMensajes();
+      invalidarMensajes();
     } catch (err) {
       console.error('Error al restaurar mensaje:', err);
       setSnackbar({
@@ -293,7 +263,7 @@ const archivarMensaje = async (id: string): Promise<void> => {
       severity: 'success'
     });
     // Actualizar la lista de mensajes
-    cargarMensajes();
+    invalidarMensajes();
   } catch (err) {
     console.error('Error al archivar mensaje:', err);
     setSnackbar({
@@ -314,7 +284,7 @@ const archivarMensaje = async (id: string): Promise<void> => {
         severity: 'success'
       });
       // Actualizar la lista de mensajes
-      cargarMensajes();
+      invalidarMensajes();
     } catch (err) {
       console.error('Error al desarchivar mensaje:', err);
       setSnackbar({
@@ -344,7 +314,7 @@ const archivarMensaje = async (id: string): Promise<void> => {
         severity: 'success'
       });
       // Actualizar la lista de mensajes
-      cargarMensajes();
+      invalidarMensajes();
     } catch (err) {
       console.error('Error al enviar borrador:', err);
       setSnackbar({

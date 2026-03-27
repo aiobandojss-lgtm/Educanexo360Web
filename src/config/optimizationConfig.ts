@@ -80,10 +80,10 @@ export const defaultOptimizationConfig: OptimizationConfig = {
   },
   
   performance: {
-    enabled: process.env.NODE_ENV === 'development',
+    enabled: import.meta.env.MODE === 'development',
     slowThreshold: 300, // ms
-    consoleLog: process.env.NODE_ENV === 'development',
-    showWarnings: process.env.NODE_ENV === 'development',
+    consoleLog: import.meta.env.MODE === 'development',
+    showWarnings: import.meta.env.MODE === 'development',
   },
   
   lazyLoading: {

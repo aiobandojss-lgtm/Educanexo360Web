@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
+import { useAsistenciaCursos, useResumenAsistencia } from "../../hooks/useAppQueries";
 import {
   Box,
   Typography,
@@ -41,7 +42,6 @@ import {
 import { format } from "date-fns";
 import { RootState } from "../../redux/store";
 import { useNotificacion } from "../../components/common/Notificaciones";
-import asistenciaService from "../../services/asistenciaService";
 
 // Interfaces
 interface Curso {
@@ -80,9 +80,7 @@ const ListaAsistencia = () => {
   const { mostrarNotificacion } = useNotificacion();
   const { user } = useSelector((state: RootState) => state.auth);
 
-  // Estados
-  const [asistencias, setAsistencias] = useState<AsistenciaResumen[]>([]);
-  const [cursos, setCursos] = useState<Curso[]>([]);
+  // Estados de filtros (controlados por el usuario)
   const [cursoSeleccionado, setCursoSeleccionado] = useState<string>("");
   const [fechaInicio, setFechaInicio] = useState<string>(
     format(
@@ -93,85 +91,36 @@ const ListaAsistencia = () => {
   const [fechaFin, setFechaFin] = useState<string>(
     format(new Date(), "yyyy-MM-dd")
   );
-  const [loading, setLoading] = useState(false);
-  const [loadingCursos, setLoadingCursos] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  // Cargar cursos
+  // Hooks de caché
+  const {
+    data: cursosRaw,
+    isLoading: loadingCursos,
+    error: errorCursos,
+  } = useAsistenciaCursos();
+  const cursos: Curso[] = (cursosRaw as Curso[]) || [];
+
+  const {
+    data: asistenciasRaw,
+    isLoading: loading,
+    error: errorAsistencias,
+  } = useResumenAsistencia(fechaInicio, fechaFin, cursoSeleccionado, user?.tipo || "");
+  const asistencias: AsistenciaResumen[] = (asistenciasRaw as AsistenciaResumen[]) || [];
+
+  const error = errorCursos
+    ? "No se pudieron cargar los cursos: " + ((errorCursos as any)?.response?.data?.message || "Error del servidor")
+    : errorAsistencias
+    ? "No se pudieron cargar las asistencias: " + ((errorAsistencias as any)?.response?.data?.message || "Error del servidor")
+    : null;
+
+  // Auto-seleccionar el único curso si es docente
   useEffect(() => {
-    const cargarCursos = async () => {
-      try {
-        setLoadingCursos(true);
-        setError(null);
-
-        const data = await asistenciaService.obtenerCursosDisponibles();
-        setCursos(data);
-
-        // Si solo hay un curso y es docente, seleccionarlo automáticamente
-        if (data.length === 1 && user?.tipo === "DOCENTE") {
-          setCursoSeleccionado(data[0]._id);
-        }
-      } catch (err: any) {
-        console.error("Error al cargar cursos:", err);
-        setError(
-          "No se pudieron cargar los cursos: " +
-            (err.response?.data?.message || "Error del servidor")
-        );
-      } finally {
-        setLoadingCursos(false);
-      }
-    };
-
-    if (user) {
-      cargarCursos();
+    if (cursos.length === 1 && user?.tipo === "DOCENTE" && !cursoSeleccionado) {
+      setCursoSeleccionado(cursos[0]._id);
     }
-  }, [user]);
-
-  // Cargar asistencias
-  const cargarAsistencias = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Agregar logs para depuración
-      console.log("Iniciando carga de asistencias con:", {
-        fechaInicio,
-        fechaFin,
-        cursoSeleccionado,
-        userType: user?.tipo,
-      });
-
-      const data = await asistenciaService.obtenerResumenAsistencia(
-        fechaInicio,
-        fechaFin,
-        cursoSeleccionado
-      );
-
-      console.log("Datos recibidos:", data);
-      setAsistencias(data);
-    } catch (err: any) {
-      console.error("Error al cargar asistencias:", err);
-
-      // Mostrar mensaje de error más detallado para depuración
-      const errorMessage = err.response?.data?.message
-        ? `${err.response.data.message} (Status: ${err.response.status})`
-        : "Error del servidor";
-
-      setError("No se pudieron cargar las asistencias: " + errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Efecto para cargar asistencias cuando cambian los filtros
-  useEffect(() => {
-    // Permitir cargar datos para ADMIN y DOCENTE sin necesidad de seleccionar curso
-    if (cursoSeleccionado || ["ADMIN", "DOCENTE"].includes(user?.tipo || "")) {
-      cargarAsistencias();
-    }
-  }, [cursoSeleccionado, fechaInicio, fechaFin]);
+  }, [cursos]);
 
   // Filtro por curso
   const handleCursoChange = (event: SelectChangeEvent) => {

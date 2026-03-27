@@ -1,5 +1,5 @@
 // src/screens/tareas/DetalleTarea.tsx
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   Box,
@@ -35,17 +35,12 @@ import { Tarea, EntregaTarea, ArchivoTarea } from "../../types/tarea.types";
 import useAuth from "../../hooks/useAuth";
 import EstadoBadge from "../../components/tareas/EstadoBadge";
 import PrioridadBadge from "../../components/tareas/PrioridadBadge";
+import { useDetalleTarea } from "../../hooks/useAppQueries";
 
 const DetalleTarea: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-
-  const [tarea, setTarea] = useState<Tarea | null>(null);
-  const [miEntrega, setMiEntrega] = useState<EntregaTarea | null>(null);
-  const [entregas, setEntregas] = useState<EntregaTarea[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
 
   const esDocente =
     user?.tipo === "ADMIN" ||
@@ -54,60 +49,18 @@ const DetalleTarea: React.FC = () => {
     user?.tipo === "COORDINADOR";
   const esEstudiante = user?.tipo === "ESTUDIANTE";
 
-  useEffect(() => {
-    if (id) {
-      cargarTarea();
-    }
-  }, [id]);
+  const {
+    data: tareaData,
+    isLoading: loading,
+    error: queryError,
+  } = useDetalleTarea(id || "", esEstudiante, esDocente);
 
-  const cargarTarea = async () => {
-    if (!id) return;
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Cargar tarea
-      const tareaRes = await tareaService.obtenerTarea(id);
-      setTarea(tareaRes.data);
-
-      // Marcar como vista si es estudiante
-      if (esEstudiante) {
-        try {
-          await tareaService.marcarVista(id);
-        } catch (err) {
-          console.log("Ya estaba marcada como vista");
-        }
-
-        // Cargar mi entrega
-        try {
-          const entregaRes = await tareaService.verMiEntrega(id);
-          setMiEntrega(entregaRes.data);
-        } catch (err) {
-          console.log("No hay entrega aún");
-        }
-      }
-
-      // Si es docente, cargar todas las entregas
-      if (esDocente) {
-        try {
-          const entregasRes = await tareaService.verEntregas(id);
-          setEntregas(entregasRes.data || []);
-        } catch (err) {
-          console.log("No se pudieron cargar entregas");
-        }
-      }
-
-      setLoading(false);
-    } catch (err: any) {
-      console.error("Error al cargar tarea:", err);
-      setError(
-        err.response?.data?.message ||
-          "No se pudo cargar la tarea. Intente nuevamente."
-      );
-      setLoading(false);
-    }
-  };
+  const tarea: Tarea | null = tareaData?.tarea ?? null;
+  const miEntrega: EntregaTarea | null = tareaData?.miEntrega ?? null;
+  const entregas: EntregaTarea[] = tareaData?.entregas ?? [];
+  const error = queryError
+    ? (queryError as any)?.response?.data?.message || "No se pudo cargar la tarea. Intente nuevamente."
+    : null;
 
   const handleDescargarArchivo = async (archivoId: string, nombre: string) => {
     if (!id) return;

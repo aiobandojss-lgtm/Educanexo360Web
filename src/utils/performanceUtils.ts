@@ -11,7 +11,7 @@ class PerformanceMonitor {
   
   private constructor() {
     this.measures = new Map();
-    this.isEnabled = process.env.NODE_ENV === 'development' || 
+    this.isEnabled = import.meta.env.MODE === 'development' ||
                     localStorage.getItem('enablePerformanceMonitoring') === 'true';
   }
   

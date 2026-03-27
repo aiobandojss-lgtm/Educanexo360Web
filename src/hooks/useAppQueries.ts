@@ -18,8 +18,11 @@ import anuncioService from "../services/anuncioService";
 import calendarioService from "../services/calendarioService";
 import invitacionService from "../services/invitacionService";
 import asignaturaService from "../services/asignaturaService";
+import mensajeService from "../services/mensajeService";
+import asistenciaService from "../services/asistenciaService";
 import axiosInstance from "../api/axiosConfig";
 import { extraerIdComoString } from "../utils/mongoUtils";
+import API_ROUTES from "../constants/apiRoutes";
 
 // ─────────────────────────────────────────────
 // CLAVES DE CACHÉ (evitar strings duplicados)
@@ -36,6 +39,11 @@ export const QUERY_KEYS = {
   EVENTOS: ["eventos"],
   TAREAS: ["tareas"],
   INVITACIONES: (pagina: number, limite: number, estado: string) => ["invitaciones", pagina, limite, estado],
+  MENSAJES: (bandeja: string, userId: string) => ["mensajes", bandeja, userId],
+  ASISTENCIA_CURSOS: ["asistencia-cursos"],
+  ASISTENCIA_RESUMEN: (inicio: string, fin: string, curso: string) => ["asistencia-resumen", inicio, fin, curso],
+  DETALLE_TAREA: (id: string, rol: string) => ["tarea-detalle", id, rol],
+  MIS_TAREAS: (key: string) => ["mis-tareas", key],
 } as const;
 
 // ─────────────────────────────────────────────
@@ -285,5 +293,133 @@ export const useEventosMes = (
       }),
     staleTime: 1000 * 60 * 5,
     placeholderData: (prev) => prev, // Mantiene el mes anterior visible mientras carga
+  });
+};
+
+// ─────────────────────────────────────────────
+// MENSAJES
+// ─────────────────────────────────────────────
+
+/** Mensajes de una bandeja. Caché de 1 minuto (alta frecuencia de cambios). */
+export const useMensajes = (bandeja: string, userId: string, puedeTenerBorradores: boolean) => {
+  return useQuery({
+    queryKey: QUERY_KEYS.MENSAJES(bandeja, userId),
+    queryFn: () => {
+      if (bandeja === "borradores" && puedeTenerBorradores) {
+        return mensajeService.obtenerBorradores();
+      }
+      return mensajeService.obtenerMensajes(bandeja, 1, 20, userId);
+    },
+    staleTime: 1000 * 60 * 1,
+    enabled: !!userId,
+  });
+};
+
+// ─────────────────────────────────────────────
+// ASISTENCIA
+// ─────────────────────────────────────────────
+
+/** Cursos disponibles para registro de asistencia. Caché de 10 minutos. */
+export const useAsistenciaCursos = () => {
+  const { user } = useSelector((state: RootState) => state.auth);
+  return useQuery({
+    queryKey: QUERY_KEYS.ASISTENCIA_CURSOS,
+    queryFn: () => asistenciaService.obtenerCursosDisponibles(),
+    staleTime: 1000 * 60 * 10,
+    enabled: !!user,
+  });
+};
+
+/** Resumen de asistencia filtrado por rango de fechas y curso. */
+export const useResumenAsistencia = (
+  fechaInicio: string,
+  fechaFin: string,
+  cursoSeleccionado: string,
+  userTipo: string
+) => {
+  return useQuery({
+    queryKey: QUERY_KEYS.ASISTENCIA_RESUMEN(fechaInicio, fechaFin, cursoSeleccionado),
+    queryFn: () =>
+      asistenciaService.obtenerResumenAsistencia(fechaInicio, fechaFin, cursoSeleccionado),
+    staleTime: 1000 * 60 * 2,
+    enabled: !!(cursoSeleccionado || ["ADMIN", "DOCENTE"].includes(userTipo)),
+  });
+};
+
+// ─────────────────────────────────────────────
+// DETALLE DE TAREA
+// ─────────────────────────────────────────────
+
+/** Detalle completo de una tarea: datos + entrega del estudiante o lista de entregas del docente. */
+export const useDetalleTarea = (id: string, esEstudiante: boolean, esDocente: boolean) => {
+  const rol = esEstudiante ? "estudiante" : esDocente ? "docente" : "otro";
+  return useQuery({
+    queryKey: QUERY_KEYS.DETALLE_TAREA(id, rol),
+    queryFn: async () => {
+      const tareaRes = await tareaService.obtenerTarea(id);
+      const tarea = tareaRes.data;
+
+      let miEntrega = null;
+      let entregas: any[] = [];
+
+      if (esEstudiante) {
+        try { await tareaService.marcarVista(id); } catch {}
+        try {
+          const entregaRes = await tareaService.verMiEntrega(id);
+          miEntrega = entregaRes.data;
+        } catch {}
+      }
+
+      if (esDocente) {
+        try {
+          const entregasRes = await tareaService.verEntregas(id);
+          entregas = entregasRes.data || [];
+        } catch {}
+      }
+
+      return { tarea, miEntrega, entregas };
+    },
+    enabled: !!id,
+    staleTime: 1000 * 60 * 2,
+  });
+};
+
+// ─────────────────────────────────────────────
+// MIS TAREAS (ESTUDIANTE / ACUDIENTE)
+// ─────────────────────────────────────────────
+
+/** Tareas del estudiante actual o de un hijo (acudiente). Incluye info del estudiante si aplica. */
+export const useMisTareas = (
+  estudianteId: string | undefined,
+  userId: string | undefined,
+  esVistaAcudiente: boolean,
+  userTipo: string
+) => {
+  const key = esVistaAcudiente ? `acudiente-${estudianteId}` : `estudiante-${userId}`;
+  return useQuery({
+    queryKey: QUERY_KEYS.MIS_TAREAS(key),
+    queryFn: async () => {
+      let estudianteInfo = null;
+      let tareasData: any[] = [];
+
+      if (esVistaAcudiente && estudianteId) {
+        try {
+          const response = await axiosInstance.get(API_ROUTES.USUARIOS.GET_BY_ID(estudianteId));
+          estudianteInfo =
+            response.data.success && response.data.data
+              ? response.data.data
+              : response.data.data || response.data;
+        } catch {}
+        const response = await tareaService.tareasEstudiante(estudianteId);
+        tareasData = response.data || [];
+      } else if (userTipo === "ESTUDIANTE") {
+        const response = await tareaService.misTareas();
+        tareasData = response.data || [];
+      }
+
+      return { tareasData, estudianteInfo };
+    },
+    enabled: esVistaAcudiente ? !!estudianteId : !!(userId && userTipo === "ESTUDIANTE"),
+    staleTime: 1000 * 60 * 2,
   });
 };

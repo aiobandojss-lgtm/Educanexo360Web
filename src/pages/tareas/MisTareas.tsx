@@ -1,5 +1,5 @@
 // src/pages/tareas/MisTareas.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import {
   Box,
   Typography,
@@ -21,11 +21,9 @@ import {
 import { useParams, useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { RootState } from "../../redux/store";
-import tareaService from "../../services/tareaService";
 import { Tarea, EntregaTarea } from "../../types/tarea.types";
 import TarjetaTarea from "../../components/tareas/TarjetaTarea";
-import axios from "../../api/axiosConfig";
-import API_ROUTES from "../../constants/apiRoutes";
+import { useMisTareas } from "../../hooks/useAppQueries";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -47,94 +45,27 @@ const MisTareas: React.FC = () => {
   const { user } = useSelector((state: RootState) => state.auth);
 
   const [tabValue, setTabValue] = useState(0);
-  const [tareasPendientes, setTareasPendientes] = useState<Tarea[]>([]);
-  const [tareasEntregadas, setTareasEntregadas] = useState<Tarea[]>([]);
-  const [tareasCalificadas, setTareasCalificadas] = useState<Tarea[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const [estudianteInfo, setEstudianteInfo] = useState<any>(null);
 
   // Determinar si es un acudiente viendo tareas de su hijo
   const esVistaAcudiente = Boolean(estudianteId && user?.tipo === "ACUDIENTE");
 
-  useEffect(() => {
-    cargarTareas();
-  }, [estudianteId]);
+  const {
+    data: queryData,
+    isLoading: loading,
+    error: queryError,
+  } = useMisTareas(estudianteId, user?._id, esVistaAcudiente, user?.tipo || "");
 
-  const cargarTareas = async () => {
-    try {
-      setLoading(true);
-      setError(null);
+  const estudianteInfo = queryData?.estudianteInfo ?? null;
+  const error = queryError
+    ? (queryError as any)?.response?.data?.message || "No se pudieron cargar las tareas. Intente nuevamente."
+    : (!esVistaAcudiente && user?.tipo !== "ESTUDIANTE" && !loading)
+    ? "Esta vista es solo para estudiantes y acudientes"
+    : null;
 
-      console.log("📚 CARGANDO TAREAS");
-      console.log("👤 Usuario actual:", user?.tipo);
-      console.log("🆔 EstudianteId:", estudianteId);
-      console.log("👨‍👩‍👧 Es vista acudiente:", esVistaAcudiente);
-
-      // Si es acudiente y hay estudianteId, cargar info del estudiante
-      if (esVistaAcudiente && estudianteId) {
-        try {
-          const response = await axios.get(
-            API_ROUTES.USUARIOS.GET_BY_ID(estudianteId)
-          );
-
-          const estudianteData =
-            response.data.success && response.data.data
-              ? response.data.data
-              : response.data.data || response.data;
-
-          setEstudianteInfo(estudianteData);
-          console.log("✅ Info del estudiante cargada:", estudianteData.nombre);
-        } catch (err) {
-          console.error("❌ Error cargando info del estudiante:", err);
-        }
-      }
-
-      // Cargar tareas según el contexto
-      let tareasData: Tarea[];
-
-      if (esVistaAcudiente && estudianteId) {
-        // Acudiente viendo tareas de su hijo
-        console.log("📖 Cargando tareas del estudiante:", estudianteId);
-        const response = await tareaService.tareasEstudiante(estudianteId);
-        tareasData = response.data || [];
-      } else if (user?.tipo === "ESTUDIANTE") {
-        // Estudiante viendo sus propias tareas
-        console.log("📖 Cargando mis tareas (estudiante)");
-        const response = await tareaService.misTareas();
-        tareasData = response.data || [];
-      } else {
-        // Otro tipo de usuario (no debería llegar aquí)
-        setError("Esta vista es solo para estudiantes y acudientes");
-        setLoading(false);
-        return;
-      }
-
-      console.log("📦 Total de tareas recibidas:", tareasData.length);
-
-      // Filtrar tareas por estado
-      const { pendientes, entregadas, calificadas } =
-        filtrarTareasPorEstado(tareasData);
-
-      setTareasPendientes(pendientes);
-      setTareasEntregadas(entregadas);
-      setTareasCalificadas(calificadas);
-
-      console.log("✅ Tareas filtradas:");
-      console.log("   - Pendientes:", pendientes.length);
-      console.log("   - Entregadas:", entregadas.length);
-      console.log("   - Calificadas:", calificadas.length);
-
-      setLoading(false);
-    } catch (err: any) {
-      console.error("❌ Error al cargar tareas:", err);
-      setError(
-        err.response?.data?.message ||
-          "No se pudieron cargar las tareas. Intente nuevamente."
-      );
-      setLoading(false);
-    }
-  };
+  const { pendientes: tareasPendientes, entregadas: tareasEntregadas, calificadas: tareasCalificadas } = useMemo(() => {
+    const tareasData: Tarea[] = queryData?.tareasData || [];
+    return filtrarTareasPorEstado(tareasData);
+  }, [queryData?.tareasData]);
 
   /**
    * Filtrar tareas por estado de entrega
