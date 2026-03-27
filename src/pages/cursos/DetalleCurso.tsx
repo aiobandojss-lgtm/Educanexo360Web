@@ -1,6 +1,8 @@
 // src/pages/cursos/DetalleCurso.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import { useCurso, useCursoEstudiantes, useCursoAsignaturas, QUERY_KEYS } from "../../hooks/useAppQueries";
 import {
   Box,
   Typography,
@@ -53,8 +55,6 @@ import cursoService, {
   EstudianteCurso,
   AsignaturaCurso,
 } from "../../services/cursoService";
-import asignaturaService from "../../services/asignaturaService";
-import axiosInstance from "../../api/axiosConfig";
 import { useSelector } from "react-redux";
 import { RootState } from "../../redux/store";
 
@@ -93,199 +93,32 @@ interface DocenteInfo {
 const DetalleCurso = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user } = useSelector((state: RootState) => state.auth);
-  const [curso, setCurso] = useState<Curso | null>(null);
-  const [estudiantes, setEstudiantes] = useState<EstudianteCurso[]>([]);
-  const [asignaturas, setAsignaturas] = useState<AsignaturaCurso[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+
+  // Las tres consultas corren en paralelo y quedan cacheadas 5 minutos
+  const { data: cursoData, isLoading: loadingCurso, isError: errorCurso } = useCurso(id ?? "");
+  const { data: estudiantesData, isLoading: loadingEstudiantes } = useCursoEstudiantes(id ?? "");
+  const { data: asignaturasData, isLoading: loadingAsignaturas } = useCursoAsignaturas(id ?? "");
+
+  const curso: Curso | null = (cursoData as Curso) ?? null;
+  const estudiantes: EstudianteCurso[] = estudiantesData?.data ?? [];
+  const asignaturas: AsignaturaCurso[] = (asignaturasData ?? []) as AsignaturaCurso[];
+  const loading = loadingCurso || loadingEstudiantes || loadingAsignaturas;
+  const error = errorCurso ? "No se pudo cargar la información del curso" : null;
+
   const [tabValue, setTabValue] = useState<number>(0);
   const [deleteDialog, setDeleteDialog] = useState<boolean>(false);
-  const [docentesInfo, setDocentesInfo] = useState<Map<string, DocenteInfo>>(
-    new Map()
-  );
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [removeEstudianteDialog, setRemoveEstudianteDialog] = useState<{
     open: boolean;
     estudiante: EstudianteCurso | null;
-  }>({
-    open: false,
-    estudiante: null,
-  });
+  }>({ open: false, estudiante: null });
   const [removeAsignaturaDialog, setRemoveAsignaturaDialog] = useState<{
     open: boolean;
     asignatura: AsignaturaCurso | null;
-  }>({
-    open: false,
-    asignatura: null,
-  });
-
-  useEffect(() => {
-    if (id) {
-      cargarCurso();
-      cargarEstudiantes();
-      cargarAsignaturas();
-    }
-  }, [id]);
-
-  const cargarCurso = async () => {
-    if (!id) return;
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      const response = await cursoService.obtenerCurso(id);
-
-      if (response?.success) {
-        setCurso(response.data);
-      } else {
-        throw new Error("Error al cargar curso");
-      }
-    } catch (err: any) {
-      console.error("Error al cargar curso:", err);
-      setError(
-        err.response?.data?.message ||
-          "No se pudo cargar la información del curso"
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const cargarEstudiantes = async () => {
-    if (!id) return;
-
-    try {
-      const response = await cursoService.obtenerEstudiantesCurso(id);
-
-      if (response?.success) {
-        setEstudiantes(response.data || []);
-      }
-    } catch (err: any) {
-      console.error("Error al cargar estudiantes:", err);
-    }
-  };
-
-  // Función para cargar docentes por IDs
-  const cargarDocentes = async (docenteIds: string[]) => {
-    if (!docenteIds || docenteIds.length === 0) return;
-
-    try {
-      // Filtrar IDs que ya tenemos en el caché
-      const idsACargar = docenteIds.filter((id) => !docentesInfo.has(id));
-
-      if (idsACargar.length === 0) return;
-
-      // Usar el endpoint correcto para obtener usuarios por IDs
-      const respuesta = await axiosInstance.get("/api/usuarios", {
-        params: {
-          ids: idsACargar.join(","),
-          tipo: "DOCENTE",
-        },
-      });
-
-      if (respuesta.data?.success && respuesta.data.data) {
-        const nuevosDocentes = new Map(docentesInfo);
-
-        respuesta.data.data.forEach((docente: DocenteInfo) => {
-          nuevosDocentes.set(docente._id, {
-            _id: docente._id,
-            nombre: docente.nombre || "Sin nombre",
-            apellidos: docente.apellidos || "",
-            email: docente.email,
-          });
-        });
-
-        setDocentesInfo(nuevosDocentes);
-        return nuevosDocentes;
-      }
-    } catch (error) {
-      console.error("Error al cargar información de docentes:", error);
-    }
-
-    return docentesInfo;
-  };
-
-  const cargarAsignaturas = async () => {
-    if (!id) return;
-
-    try {
-      setLoading(true);
-
-      // Usar el servicio asignaturaService con expand=docente
-      const response = await asignaturaService.obtenerAsignaturas({
-        cursoId: id,
-        expand: "docente",
-      });
-
-      if (response.success) {
-        let asignaturasData = response.data || [];
-        console.log("Asignaturas cargadas:", asignaturasData);
-
-        // Extraer IDs de docentes para cargar información adicional
-        const docenteIds: string[] = [];
-
-        asignaturasData.forEach((asignatura: any) => {
-          if (asignatura.docenteId) {
-            docenteIds.push(asignatura.docenteId);
-          } else if (
-            asignatura.docente &&
-            typeof asignatura.docente === "string"
-          ) {
-            docenteIds.push(asignatura.docente);
-          } else if (
-            asignatura.docente &&
-            typeof asignatura.docente === "object" &&
-            asignatura.docente._id
-          ) {
-            docenteIds.push(asignatura.docente._id);
-          }
-        });
-
-        // Cargar información de docentes si es necesario
-        if (docenteIds.length > 0) {
-          const docentesActualizados = await cargarDocentes(docenteIds);
-
-          // Si tenemos información de docentes actualizada, mejorar los datos de asignaturas
-          if (docentesActualizados && docentesActualizados.size > 0) {
-            asignaturasData = asignaturasData.map((asignatura: any) => {
-              const docenteId =
-                asignatura.docenteId ||
-                (typeof asignatura.docente === "string"
-                  ? asignatura.docente
-                  : null) ||
-                (asignatura.docente && asignatura.docente._id
-                  ? asignatura.docente._id
-                  : null);
-
-              if (docenteId && docentesActualizados.has(docenteId)) {
-                return {
-                  ...asignatura,
-                  docente: docentesActualizados.get(docenteId),
-                };
-              }
-              return asignatura;
-            });
-          }
-        }
-
-        setAsignaturas(
-          asignaturasData.map((asignatura: any) => ({
-            ...asignatura,
-            docente: asignatura.docente || {
-              _id: "",
-              nombre: "No asignado",
-              apellidos: "",
-            },
-          })) as AsignaturaCurso[]
-        );
-      }
-    } catch (err: any) {
-      console.error("Error al cargar asignaturas:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }>({ open: false, asignatura: null });
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
@@ -295,16 +128,15 @@ const DetalleCurso = () => {
     if (!id) return;
 
     try {
-      setLoading(true);
+      setActionLoading(true);
       await cursoService.eliminarCurso(id);
-      navigate("/cursos", {
-        state: { message: "Curso eliminado exitosamente" },
-      });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CURSOS });
+      navigate("/cursos", { state: { message: "Curso eliminado exitosamente" } });
     } catch (err: any) {
       console.error("Error al eliminar curso:", err);
-      setError(err.response?.data?.message || "No se pudo eliminar el curso");
+      setActionError(err.response?.data?.message || "No se pudo eliminar el curso");
     } finally {
-      setLoading(false);
+      setActionLoading(false);
       setDeleteDialog(false);
     }
   };
@@ -313,26 +145,14 @@ const DetalleCurso = () => {
     if (!id || !removeEstudianteDialog.estudiante) return;
 
     try {
-      setLoading(true);
-      await cursoService.eliminarEstudianteCurso(
-        id,
-        removeEstudianteDialog.estudiante._id
-      );
-
-      // Actualizar lista de estudiantes
-      setEstudiantes(
-        estudiantes.filter(
-          (est) => est._id !== removeEstudianteDialog.estudiante?._id
-        )
-      );
+      setActionLoading(true);
+      await cursoService.eliminarEstudianteCurso(id, removeEstudianteDialog.estudiante._id);
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CURSO_ESTUDIANTES(id) });
     } catch (err: any) {
       console.error("Error al eliminar estudiante del curso:", err);
-      setError(
-        err.response?.data?.message ||
-          "No se pudo eliminar el estudiante del curso"
-      );
+      setActionError(err.response?.data?.message || "No se pudo eliminar el estudiante del curso");
     } finally {
-      setLoading(false);
+      setActionLoading(false);
       setRemoveEstudianteDialog({ open: false, estudiante: null });
     }
   };
@@ -341,26 +161,14 @@ const DetalleCurso = () => {
     if (!id || !removeAsignaturaDialog.asignatura) return;
 
     try {
-      setLoading(true);
-      await cursoService.eliminarAsignaturaCurso(
-        id,
-        removeAsignaturaDialog.asignatura._id
-      );
-
-      // Actualizar lista de asignaturas
-      setAsignaturas(
-        asignaturas.filter(
-          (asig) => asig._id !== removeAsignaturaDialog.asignatura?._id
-        )
-      );
+      setActionLoading(true);
+      await cursoService.eliminarAsignaturaCurso(id, removeAsignaturaDialog.asignatura._id);
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CURSO_ASIGNATURAS(id) });
     } catch (err: any) {
       console.error("Error al eliminar asignatura del curso:", err);
-      setError(
-        err.response?.data?.message ||
-          "No se pudo eliminar la asignatura del curso"
-      );
+      setActionError(err.response?.data?.message || "No se pudo eliminar la asignatura del curso");
     } finally {
-      setLoading(false);
+      setActionLoading(false);
       setRemoveAsignaturaDialog({ open: false, asignatura: null });
     }
   };
@@ -403,25 +211,11 @@ const DetalleCurso = () => {
 
   // Función para obtener nombre del docente de forma segura
   const getNombreDocente = (asignatura: AsignaturaCurso): string => {
-    // CASO 1: Si docente es un objeto con nombre y apellidos
     if (asignatura.docente && typeof asignatura.docente === "object") {
       const docente = asignatura.docente;
-      if (docente.nombre && docente.apellidos) {
-        return `${docente.nombre} ${docente.apellidos}`;
-      }
-      if (docente.nombre) {
-        return docente.nombre;
-      }
+      if (docente.nombre && docente.apellidos) return `${docente.nombre} ${docente.apellidos}`;
+      if (docente.nombre) return docente.nombre;
     }
-
-    // CASO 2: Buscar en el caché de docentes si tenemos el ID del docente
-    if (asignatura.docente && asignatura.docente._id) {
-      const docenteInfo = docentesInfo.get(asignatura.docente._id);
-      if (docenteInfo) {
-        return `${docenteInfo.nombre} ${docenteInfo.apellidos}`;
-      }
-    }
-
     return "No asignado";
   };
 
@@ -552,19 +346,14 @@ const DetalleCurso = () => {
         </Box>
       </Box>
 
-      {/* Alerta de error */}
-      {error && (
+      {/* Alerta de error en acciones (eliminar, etc.) */}
+      {actionError && (
         <Alert
           severity="error"
-          sx={{
-            mb: 3,
-            borderRadius: 2,
-            "& .MuiAlert-message": {
-              fontWeight: 500,
-            },
-          }}
+          sx={{ mb: 3, borderRadius: 2, "& .MuiAlert-message": { fontWeight: 500 } }}
+          onClose={() => setActionError(null)}
         >
-          {error}
+          {actionError}
         </Alert>
       )}
 

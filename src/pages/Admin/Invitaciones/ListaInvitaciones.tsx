@@ -1,6 +1,8 @@
 // src/Pages/Admin/Invitaciones/ListaInvitaciones.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import { useInvitaciones, QUERY_KEYS } from "../../../hooks/useAppQueries";
 import {
   Box,
   Button,
@@ -43,7 +45,6 @@ import {
 import invitacionService, {
   Invitacion,
 } from "../../../services/invitacionService";
-import cursoService from "../../../services/cursoService";
 import { extraerIdComoString } from "../../../utils/mongoUtils";
 
 // Función para obtener color de chip según estado
@@ -93,11 +94,8 @@ const UsosDisplay = ({
 
 const ListaInvitaciones: React.FC = () => {
   const navigate = useNavigate();
-  const [invitaciones, setInvitaciones] = useState<Invitacion[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedInvitacion, setSelectedInvitacion] =
-    useState<Invitacion | null>(null);
+  const queryClient = useQueryClient();
+  const [selectedInvitacion, setSelectedInvitacion] = useState<Invitacion | null>(null);
   const [openRevocDialog, setOpenRevocDialog] = useState(false);
   const [copiado, setCopiado] = useState<string | null>(null);
   const [mensajeAlerta, setMensajeAlerta] = useState<{
@@ -105,94 +103,19 @@ const ListaInvitaciones: React.FC = () => {
     tipo: "success" | "error" | "warning" | "info";
   } | null>(null);
 
-  // Estados para información adicional
-  const [cursosInfo, setCursosInfo] = useState<{ [key: string]: any }>({});
-
   // Paginación y filtros
   const [pagina, setPagina] = useState(1);
-  const [limite, setLimite] = useState(10);
-  const [total, setTotal] = useState(0);
+  const [limite] = useState(10);
   const [filtro, setFiltro] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState("");
 
-  // Cargar invitaciones cuando cambia la página o el límite
-  useEffect(() => {
-    console.log("useEffect ejecutándose - Cargando invitaciones");
-    cargarInvitaciones();
-  }, [pagina, limite]);
+  // Datos con caché — resuelve cursos en paralelo automáticamente
+  const { data, isLoading: loading, isError, refetch } = useInvitaciones(pagina, limite, estadoFiltro);
 
-  // Función para cargar información adicional de cursos
-  const cargarInformacionAdicional = async (invitaciones: Invitacion[]) => {
-    const cursosMap: { [key: string]: any } = {};
-    const cursosIds = Array.from(
-      new Set(
-        invitaciones
-          .filter((inv) => inv.cursoId)
-          .map((inv) => extraerIdComoString(inv.cursoId))
-          .filter((id) => id && id.length > 0)
-      )
-    );
-
-    console.log("🔍 IDs de cursos a cargar:", cursosIds);
-
-    try {
-      for (const cursoId of cursosIds) {
-        try {
-          console.log(`📚 Cargando curso: ${cursoId}`);
-          const curso = await cursoService.obtenerCursoPorId(cursoId);
-          cursosMap[cursoId] = curso;
-          console.log(`✅ Curso cargado exitosamente:`, {
-            id: cursoId,
-            nombre: curso.nombre,
-            grado: curso.grado,
-            grupo: curso.grupo || curso.seccion,
-          });
-        } catch (err: any) {
-          console.error(`❌ Error al cargar curso ${cursoId}:`, {
-            status: err.response?.status,
-            message: err.response?.data?.message || err.message,
-          });
-
-          if (err.response?.status === 401) {
-            cursosMap[cursoId] = {
-              nombre: "🔒 Sin autenticación",
-              grado: "",
-              seccion: "",
-              grupo: "",
-            };
-          } else if (err.response?.status === 403) {
-            cursosMap[cursoId] = {
-              nombre: "🚫 Sin permisos",
-              grado: "",
-              seccion: "",
-              grupo: "",
-            };
-          } else if (err.response?.status === 404) {
-            cursosMap[cursoId] = {
-              nombre: "❓ Curso no encontrado",
-              grado: "",
-              seccion: "",
-              grupo: "",
-            };
-          } else {
-            cursosMap[cursoId] = {
-              nombre: "❌ Error al cargar",
-              grado: "",
-              seccion: "",
-              grupo: "",
-            };
-          }
-        }
-      }
-
-      setCursosInfo(cursosMap);
-      console.log("✅ Información adicional cargada:", {
-        cursos: Object.keys(cursosMap).length,
-      });
-    } catch (error) {
-      console.error("💥 Error general al cargar información adicional:", error);
-    }
-  };
+  const invitaciones: Invitacion[] = data?.invitaciones ?? [];
+  const total: number = data?.total ?? 0;
+  const cursosInfo: { [key: string]: any } = data?.cursosInfo ?? {};
+  const error = isError ? "Error al cargar la lista de invitaciones" : null;
 
   // Función para mostrar destino de la invitación
   const mostrarDestinoInvitacion = (invitacion: Invitacion) => {
@@ -262,37 +185,6 @@ const ListaInvitaciones: React.FC = () => {
     }
   };
 
-  const cargarInvitaciones = async () => {
-    console.log("Iniciando carga de invitaciones");
-    setLoading(true);
-    setError(null);
-
-    try {
-      const resp = await invitacionService.obtenerInvitaciones(
-        pagina,
-        limite,
-        estadoFiltro || undefined
-      );
-
-      const invitacionesArray = resp?.invitaciones || [];
-      setInvitaciones(invitacionesArray);
-      setTotal(resp?.total || 0);
-
-      // Cargar información adicional de cursos
-      await cargarInformacionAdicional(invitacionesArray);
-
-      console.log(`Cargadas ${invitacionesArray.length} invitaciones`);
-    } catch (err: any) {
-      console.error("Error al cargar invitaciones:", err);
-      setError(
-        "Error al cargar la lista de invitaciones: " +
-          (err.message || "Error desconocido")
-      );
-      setInvitaciones([]);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Función para copiar código al portapapeles
   const copiarCodigo = (codigo: string, estado: string) => {
@@ -364,14 +256,14 @@ const ListaInvitaciones: React.FC = () => {
       });
       setTimeout(() => setMensajeAlerta(null), 4000);
 
-      cargarInvitaciones();
+      queryClient.invalidateQueries({ queryKey: ["invitaciones"] });
     } catch (err: any) {
       console.error("Error al revocar invitación:", err);
-      if (err.response && err.response.data && err.response.data.message) {
-        setError(err.response.data.message);
-      } else {
-        setError("Error al revocar la invitación.");
-      }
+      setMensajeAlerta({
+        texto: err.response?.data?.message || "Error al revocar la invitación.",
+        tipo: "error",
+      });
+      setTimeout(() => setMensajeAlerta(null), 4000);
     }
   };
 
@@ -387,10 +279,6 @@ const ListaInvitaciones: React.FC = () => {
   const handleEstadoChange = (e: React.ChangeEvent<{ value: unknown }>) => {
     setEstadoFiltro(e.target.value as string);
     setPagina(1);
-
-    setTimeout(() => {
-      cargarInvitaciones();
-    }, 100);
   };
 
   // Filtrar invitaciones
@@ -470,7 +358,7 @@ const ListaInvitaciones: React.FC = () => {
           >
             <Button
               variant="outlined"
-              onClick={cargarInvitaciones}
+              onClick={() => refetch()}
               disabled={loading}
               startIcon={<RefreshIcon />}
             >
@@ -511,7 +399,6 @@ const ListaInvitaciones: React.FC = () => {
                 onClick={() => {
                   setFiltro("");
                   setEstadoFiltro("");
-                  setTimeout(cargarInvitaciones, 100);
                 }}
               >
                 Limpiar filtros

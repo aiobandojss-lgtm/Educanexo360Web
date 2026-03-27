@@ -125,20 +125,18 @@ const FormularioTarea: React.FC = () => {
     try {
       setLoading(true);
 
-      // Cargar cursos
-      const cursosRes = await cursoService.listarCursos({ limite: 100 });
+      // Cargar cursos y asignaturas en paralelo
+      const [cursosRes, asignaturasRes] = await Promise.all([
+        cursoService.listarCursos({ limite: 100 }),
+        asignaturaService.listarAsignaturas({ limite: 100 }),
+      ]);
+
       setCursos(cursosRes.data || []);
-
-      // Cargar asignaturas
-      const asignaturasRes = await asignaturaService.listarAsignaturas({
-        limite: 100,
-      });
       setAsignaturas(asignaturasRes.data || []);
-
-      setLoading(false);
     } catch (err) {
       console.error("Error al cargar datos:", err);
       setError("No se pudieron cargar los datos necesarios");
+    } finally {
       setLoading(false);
     }
   };

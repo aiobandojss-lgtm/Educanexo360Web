@@ -16,6 +16,10 @@ import cursoService from "../services/cursoService";
 import usuarioService from "../services/usuarioService";
 import anuncioService from "../services/anuncioService";
 import calendarioService from "../services/calendarioService";
+import invitacionService from "../services/invitacionService";
+import asignaturaService from "../services/asignaturaService";
+import axiosInstance from "../api/axiosConfig";
+import { extraerIdComoString } from "../utils/mongoUtils";
 
 // ─────────────────────────────────────────────
 // CLAVES DE CACHÉ (evitar strings duplicados)
@@ -25,10 +29,13 @@ export const QUERY_KEYS = {
   ESCUELA: (id: string) => ["escuela", id],
   CURSOS: ["cursos"],
   CURSO_DETALLE: (id: string) => ["curso", id],
+  CURSO_ESTUDIANTES: (id: string) => ["curso-estudiantes", id],
+  CURSO_ASIGNATURAS: (id: string) => ["curso-asignaturas", id],
   USUARIOS: (tipo?: string) => ["usuarios", tipo ?? "todos"],
   ANUNCIOS: ["anuncios"],
   EVENTOS: ["eventos"],
   TAREAS: ["tareas"],
+  INVITACIONES: (pagina: number, limite: number, estado: string) => ["invitaciones", pagina, limite, estado],
 } as const;
 
 // ─────────────────────────────────────────────
@@ -145,6 +152,115 @@ export const useTareasFiltradas = (params: Record<string, unknown>) => {
     queryFn: () => tareaService.listarTareas(params),
     staleTime: 1000 * 60 * 2,
     placeholderData: (prev) => prev,
+  });
+};
+
+// ─────────────────────────────────────────────
+// INVITACIONES
+// ─────────────────────────────────────────────
+
+/** Lista de invitaciones paginada. Resuelve cursos asociados en paralelo (fix N+1). */
+export const useInvitaciones = (pagina: number, limite: number, estadoFiltro: string) => {
+  return useQuery({
+    queryKey: QUERY_KEYS.INVITACIONES(pagina, limite, estadoFiltro),
+    queryFn: async () => {
+      const resp = await invitacionService.obtenerInvitaciones(
+        pagina,
+        limite,
+        estadoFiltro || undefined
+      );
+      const invitaciones = resp?.invitaciones || [];
+
+      // Recolectar IDs de cursos únicos
+      const cursosIds = Array.from(
+        new Set(
+          invitaciones
+            .filter((inv: any) => inv.cursoId)
+            .map((inv: any) => extraerIdComoString(inv.cursoId))
+            .filter((id: string) => id && id.length > 0)
+        )
+      ) as string[];
+
+      // Cargar todos los cursos en paralelo (fix del N+1)
+      const cursosInfo: { [key: string]: any } = {};
+      if (cursosIds.length > 0) {
+        const resultados = await Promise.allSettled(
+          cursosIds.map((id) => cursoService.obtenerCursoPorId(id))
+        );
+        cursosIds.forEach((id, index) => {
+          const resultado = resultados[index];
+          cursosInfo[id] = resultado.status === "fulfilled"
+            ? resultado.value
+            : { nombre: "No disponible", grado: "", seccion: "", grupo: "" };
+        });
+      }
+
+      return { invitaciones, total: resp?.total || 0, cursosInfo };
+    },
+    staleTime: 1000 * 60 * 2,
+    placeholderData: (prev) => prev,
+  });
+};
+
+// ─────────────────────────────────────────────
+// DETALLE DE CURSO (estudiantes y asignaturas)
+// ─────────────────────────────────────────────
+
+/** Estudiantes de un curso. */
+export const useCursoEstudiantes = (id: string) => {
+  return useQuery({
+    queryKey: QUERY_KEYS.CURSO_ESTUDIANTES(id),
+    queryFn: () => cursoService.obtenerEstudiantesCurso(id),
+    enabled: !!id,
+    staleTime: 1000 * 60 * 5,
+  });
+};
+
+/** Asignaturas de un curso con info de docentes resuelta en una sola petición batch. */
+export const useCursoAsignaturas = (id: string) => {
+  return useQuery({
+    queryKey: QUERY_KEYS.CURSO_ASIGNATURAS(id),
+    queryFn: async () => {
+      const response = await asignaturaService.obtenerAsignaturas({ cursoId: id, expand: "docente" });
+      if (!response.success) return [];
+
+      let asignaturasData: any[] = response.data || [];
+
+      // Recolectar IDs únicos de docentes
+      const docenteIds = Array.from(new Set(
+        asignaturasData
+          .map((a: any) => a.docenteId || (typeof a.docente === "string" ? a.docente : a.docente?._id))
+          .filter(Boolean)
+      )) as string[];
+
+      // Una sola petición batch para todos los docentes
+      if (docenteIds.length > 0) {
+        try {
+          const respuesta = await axiosInstance.get("/api/usuarios", {
+            params: { ids: docenteIds.join(","), tipo: "DOCENTE" },
+          });
+          if (respuesta.data?.success && respuesta.data.data) {
+            const docentesMap = new Map<string, any>(
+              respuesta.data.data.map((d: any) => [d._id, d])
+            );
+            asignaturasData = asignaturasData.map((a: any) => {
+              const docenteId = a.docenteId || (typeof a.docente === "string" ? a.docente : a.docente?._id);
+              const docenteInfo = docenteId ? docentesMap.get(docenteId) : null;
+              return { ...a, docente: docenteInfo || a.docente || { _id: "", nombre: "No asignado", apellidos: "" } };
+            });
+          }
+        } catch {
+          // Si falla, se muestran los datos sin info de docente
+        }
+      }
+
+      return asignaturasData.map((a: any) => ({
+        ...a,
+        docente: a.docente || { _id: "", nombre: "No asignado", apellidos: "" },
+      }));
+    },
+    enabled: !!id,
+    staleTime: 1000 * 60 * 5,
   });
 };
 
