@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Box,
   Button,
@@ -30,35 +31,18 @@ import anuncioService from "../../services/anuncioService";
 import { Anuncio, ArchivoAdjunto } from "../../types/anuncio.types";
 import useAuth from "../../hooks/useAuth";
 import ReactMarkdown from "react-markdown";
+import { useDetalleAnuncio, QUERY_KEYS } from "../../hooks/useAppQueries";
 
 const DetalleAnuncio: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const [anuncio, setAnuncio] = useState<Anuncio | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
   const [confirmEliminar, setConfirmEliminar] = useState<boolean>(false);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user } = useAuth();
 
-  // Obtener el anuncio
-  useEffect(() => {
-    if (!id) return;
-
-    const cargarAnuncio = async () => {
-      try {
-        setLoading(true);
-        const response = await anuncioService.obtenerAnuncio(id);
-        setAnuncio(response.data);
-        setLoading(false);
-      } catch (err) {
-        console.error("Error al cargar el anuncio:", err);
-        setError("No se pudo cargar el anuncio. Intente nuevamente.");
-        setLoading(false);
-      }
-    };
-
-    cargarAnuncio();
-  }, [id]);
+  const { data: queryData, isLoading: loading, error: queryError } = useDetalleAnuncio(id || "");
+  const anuncio: Anuncio | null = (queryData?.data as Anuncio) ?? null;
+  const error = queryError ? "No se pudo cargar el anuncio. Intente nuevamente." : null;
 
   // Verificar si el usuario puede editar/eliminar este anuncio
   const puedeEditar =
@@ -71,12 +55,10 @@ const DetalleAnuncio: React.FC = () => {
 
     try {
       await anuncioService.publicarAnuncio(id);
-      // Actualizar la información del anuncio
-      const response = await anuncioService.obtenerAnuncio(id);
-      setAnuncio(response.data);
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ANUNCIO_DETALLE(id) });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ANUNCIOS });
     } catch (err) {
       console.error("Error al publicar el anuncio:", err);
-      setError("No se pudo publicar el anuncio. Intente nuevamente.");
     }
   };
 
@@ -89,7 +71,6 @@ const DetalleAnuncio: React.FC = () => {
       navigate("/anuncios");
     } catch (err) {
       console.error("Error al eliminar el anuncio:", err);
-      setError("No se pudo eliminar el anuncio. Intente nuevamente.");
       setConfirmEliminar(false);
     }
   };

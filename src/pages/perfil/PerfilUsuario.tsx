@@ -1,5 +1,5 @@
 // src/pages/perfil/PerfilUsuario.tsx
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import {
@@ -30,9 +30,7 @@ import {
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { RootState } from '../../redux/store';
-import usuarioService from '../../services/usuarioService';
-import axiosInstance from '../../api/axiosConfig';
-import API_ROUTES from '../../constants/apiRoutes';
+import { useDetalleUsuarioPerfil } from '../../hooks/useAppQueries';
 
 // Interfaces para manejar diferentes tipos de datos
 interface EscuelaId {
@@ -57,66 +55,10 @@ const PerfilUsuario = () => {
   const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.auth.user);
 
-  const [userDetails, setUserDetails] = useState<UserData | null>(null);
-  const [escuela, setEscuela] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  
-  // Función para extraer el ID de la escuela de forma segura
-  const getEscuelaId = (escuelaData: string | EscuelaId): string => {
-    if (typeof escuelaData === 'string') {
-      return escuelaData;
-    } else if (escuelaData && typeof escuelaData === 'object') {
-      return escuelaData._id || String(escuelaData);
-    }
-    return '';
-  };
-  
-  useEffect(() => {
-    const cargarDatosUsuario = async () => {
-      if (!user) return;
-      
-      try {
-        setLoading(true);
-        setError(null);
-        
-        // Obtener detalles completos del usuario
-        const response = await usuarioService.obtenerUsuario(user?._id || '');
-        
-        if (response.success) {
-          setUserDetails(response.data);
-          
-          // Cargar información de la escuela solo si el usuario NO es ACUDIENTE
-          if (response.data.escuelaId ) { //&& response.data.tipo !== 'ACUDIENTE') {
-            try {
-              const escuelaId = getEscuelaId(response.data.escuelaId);
-              if (escuelaId) {
-                const escuelaResponse = await axiosInstance.get(`${API_ROUTES.ESCUELAS.BASE}/${escuelaId}`);
-                if (escuelaResponse.data?.success) {
-                  setEscuela(escuelaResponse.data.data);
-                }
-              }
-            } catch (escuelaError) {
-              console.log("No se pudo cargar información de la escuela, continuando sin ella");
-              // No establecemos error general para no interrumpir la visualización del perfil
-            }
-          } else if (response.data.tipo === 'ACUDIENTE') {
-            // Para ACUDIENTEs, establecer un valor por defecto para la escuela
-            setEscuela({ nombre: "Información no disponible" });
-          }
-        } else {
-          setError('No se pudo cargar la información del usuario');
-        }
-      } catch (err) {
-        console.error('Error al cargar datos del perfil:', err);
-        setError('Error al cargar datos del perfil');
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    cargarDatosUsuario();
-  }, [user]);
+  const { data: queryData, isLoading: loading, error: queryError } = useDetalleUsuarioPerfil(user?._id || '');
+  const userDetails: UserData | null = (queryData?.userData as UserData) ?? null;
+  const escuela = queryData?.escuela ?? null;
+  const error = queryError ? 'Error al cargar datos del perfil' : null;
   
   const navigateToEdit = () => {
     navigate('/perfil/editar');

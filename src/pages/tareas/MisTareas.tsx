@@ -75,46 +75,29 @@ const MisTareas: React.FC = () => {
     const entregadas: Tarea[] = [];
     const calificadas: Tarea[] = [];
 
-    console.log("\n🔄 FILTRANDO TAREAS POR ESTADO");
-    console.log("📦 Total de tareas a filtrar:", tareas.length);
-
-    tareas.forEach((tarea, index) => {
-      console.log(`\n--- Tarea ${index + 1}: ${tarea.titulo} ---`);
+    tareas.forEach((tarea) => {
       const entrega = getEntregaEstudiante(tarea);
 
       if (!entrega) {
-        console.log("   → Sin entrega = PENDIENTE");
         pendientes.push(tarea);
       } else {
         const estado = (entrega as any).estado;
         const calificacion = (entrega as any).calificacion;
 
-        console.log("   📊 Estado entrega:", estado);
-        console.log("   ⭐ Calificación:", calificacion);
-
         // Verificar si está calificada
         if (estado === "CALIFICADA" || calificacion !== undefined) {
-          console.log("   → CALIFICADA ✅");
           calificadas.push(tarea);
-        } 
+        }
         // Verificar si está entregada pero sin calificar
         else if (estado === "ENTREGADA" || estado === "ATRASADA") {
-          console.log("   → ENTREGADA (sin calificar) 📤");
           entregadas.push(tarea);
-        } 
+        }
         // Pendiente o vista
         else {
-          console.log("   → PENDIENTE ⏳");
           pendientes.push(tarea);
         }
       }
     });
-
-    console.log("\n📊 RESULTADO DEL FILTRADO:");
-    console.log("   ⏳ Pendientes:", pendientes.length);
-    console.log("   📤 Entregadas:", entregadas.length);
-    console.log("   ✅ Calificadas:", calificadas.length);
-    console.log("══════════════════════════════════\n");
 
     return { pendientes, entregadas, calificadas };
   };
@@ -138,74 +121,39 @@ const MisTareas: React.FC = () => {
   const getEntregaEstudiante = (tarea: Tarea): EntregaTarea | undefined => {
     const tareaAny = tarea as any;
 
-    console.log("🔍 Buscando entrega en tarea:", tarea.titulo);
-    console.log("   Tiene miEntrega:", !!tareaAny.miEntrega);
-    console.log("   Tiene entregaEstudiante:", !!tareaAny.entregaEstudiante);
-    console.log("   Tiene entregas:", !!tareaAny.entregas);
-
     // CASO 1: El backend envía "miEntrega" (singular) - Para estudiantes
     if (tareaAny.miEntrega) {
-      console.log("   ✅ Usando miEntrega (formato estudiante)");
-      console.log("   Estado:", tareaAny.miEntrega.estado);
-      console.log("   Calificación:", tareaAny.miEntrega.calificacion);
       return tareaAny.miEntrega as EntregaTarea;
     }
 
     // CASO 2: El backend envía "entregaEstudiante" (singular) - Para acudientes
     if (tareaAny.entregaEstudiante) {
-      console.log("   ✅ Usando entregaEstudiante (formato acudiente)");
-      console.log("   Estado:", tareaAny.entregaEstudiante.estado);
-      console.log("   Calificación:", tareaAny.entregaEstudiante.calificacion);
       return tareaAny.entregaEstudiante as EntregaTarea;
     }
 
     // CASO 3: El backend envía "entregas" (array) - Para docentes/admin
-    if (
-      !tarea.entregas ||
-      !Array.isArray(tarea.entregas) ||
-      tarea.entregas.length === 0
-    ) {
-      console.log("   ❌ No hay entregas disponibles");
+    if (!tarea.entregas || !Array.isArray(tarea.entregas) || tarea.entregas.length === 0) {
       return undefined;
     }
 
-    // ID del estudiante a buscar (convertir a string)
     const targetEstudianteId = String(estudianteId || user?._id);
 
-    console.log("   🔎 Buscando en array de entregas...");
-    console.log("   Target ID:", targetEstudianteId);
-    console.log("   Total entregas:", tarea.entregas.length);
-
-    const entrega = tarea.entregas.find((entrega: EntregaTarea) => {
-      // Extraer el ID de la entrega
+    return tarea.entregas.find((entrega: EntregaTarea) => {
       let entregaEstudianteId: string;
 
       if (typeof entrega.estudianteId === "string") {
         entregaEstudianteId = entrega.estudianteId;
       } else if (entrega.estudianteId && typeof entrega.estudianteId === "object") {
-        entregaEstudianteId = (entrega.estudianteId as any)._id || 
-                              (entrega.estudianteId as any).$oid ||
-                              String(entrega.estudianteId);
+        entregaEstudianteId =
+          (entrega.estudianteId as any)._id ||
+          (entrega.estudianteId as any).$oid ||
+          String(entrega.estudianteId);
       } else {
         entregaEstudianteId = String(entrega.estudianteId);
       }
 
-      const match = String(entregaEstudianteId) === String(targetEstudianteId);
-
-      if (match) {
-        console.log("   ✅ Match encontrado!");
-        console.log("      Estado:", (entrega as any).estado);
-        console.log("      Calificación:", (entrega as any).calificacion);
-      }
-
-      return match;
+      return String(entregaEstudianteId) === String(targetEstudianteId);
     });
-
-    if (!entrega) {
-      console.log("   ❌ No se encontró entrega para este estudiante");
-    }
-
-    return entrega;
   };
 
   if (loading) {
@@ -219,7 +167,7 @@ const MisTareas: React.FC = () => {
         }}
       >
         <Box sx={{ textAlign: "center" }}>
-          <CircularProgress sx={{ color: "#8B5CF6" }} />
+          <CircularProgress sx={{ color: "#059669" }} />
           <Typography variant="body1" color="text.secondary" sx={{ mt: 2 }}>
             Cargando tareas...
           </Typography>
@@ -237,8 +185,8 @@ const MisTareas: React.FC = () => {
             <IconButton
               onClick={handleVolver}
               sx={{
-                color: "#8B5CF6",
-                "&:hover": { backgroundColor: "rgba(139, 92, 246, 0.1)" },
+                color: "#059669",
+                "&:hover": { backgroundColor: "rgba(5, 150, 105, 0.1)" },
               }}
             >
               <ArrowBackIcon />

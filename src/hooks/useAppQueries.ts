@@ -44,6 +44,10 @@ export const QUERY_KEYS = {
   ASISTENCIA_RESUMEN: (inicio: string, fin: string, curso: string) => ["asistencia-resumen", inicio, fin, curso],
   DETALLE_TAREA: (id: string, rol: string) => ["tarea-detalle", id, rol],
   MIS_TAREAS: (key: string) => ["mis-tareas", key],
+  ANUNCIO_DETALLE: (id: string) => ["anuncio-detalle", id],
+  LISTA_ENTREGAS: (tareaId: string) => ["lista-entregas", tareaId],
+  DETALLE_USUARIO: (id: string) => ["usuario-detalle", id],
+  ESCUELAS_LISTA: (page: number, q: string) => ["escuelas-lista", page, q],
 } as const;
 
 // ─────────────────────────────────────────────
@@ -421,5 +425,97 @@ export const useMisTareas = (
     },
     enabled: esVistaAcudiente ? !!estudianteId : !!(userId && userTipo === "ESTUDIANTE"),
     staleTime: 1000 * 60 * 2,
+  });
+};
+
+// ─────────────────────────────────────────────
+// DETALLE ANUNCIO
+// ─────────────────────────────────────────────
+
+/** Detalle de un anuncio por ID. Caché de 5 minutos. */
+export const useDetalleAnuncio = (id: string) => {
+  return useQuery({
+    queryKey: QUERY_KEYS.ANUNCIO_DETALLE(id),
+    queryFn: () => anuncioService.obtenerAnuncio(id),
+    enabled: !!id,
+    staleTime: 1000 * 60 * 5,
+  });
+};
+
+// ─────────────────────────────────────────────
+// LISTA DE ENTREGAS (docente)
+// ─────────────────────────────────────────────
+
+/** Tarea + sus entregas en paralelo. Caché de 2 minutos. */
+export const useEntregas = (tareaId: string) => {
+  return useQuery({
+    queryKey: QUERY_KEYS.LISTA_ENTREGAS(tareaId),
+    queryFn: async () => {
+      const [tareaRes, entregasRes] = await Promise.all([
+        tareaService.obtenerTarea(tareaId),
+        tareaService.verEntregas(tareaId),
+      ]);
+      return { tarea: tareaRes.data, entregas: entregasRes.data || [] };
+    },
+    enabled: !!tareaId,
+    staleTime: 1000 * 60 * 2,
+  });
+};
+
+// ─────────────────────────────────────────────
+// PERFIL DE USUARIO
+// ─────────────────────────────────────────────
+
+/** Datos completos del perfil: usuario + escuela. Caché de 10 minutos. */
+export const useDetalleUsuarioPerfil = (userId: string) => {
+  return useQuery({
+    queryKey: QUERY_KEYS.DETALLE_USUARIO(userId),
+    queryFn: async () => {
+      const response = await usuarioService.obtenerUsuario(userId);
+      if (!response.success) throw new Error("No se pudo cargar el usuario");
+      const userData = response.data;
+
+      let escuela = null;
+      if (userData.escuelaId) {
+        const escuelaId =
+          typeof userData.escuelaId === "string"
+            ? userData.escuelaId
+            : (userData.escuelaId as any)?._id || "";
+        if (escuelaId) {
+          try {
+            const escuelaRes = await escuelaService.obtenerPorId(escuelaId);
+            escuela = escuelaRes;
+          } catch {}
+        }
+      } else if (userData.tipo === "ACUDIENTE") {
+        escuela = { nombre: "Información no disponible" };
+      }
+
+      return { userData, escuela };
+    },
+    enabled: !!userId,
+    staleTime: 1000 * 60 * 10,
+  });
+};
+
+// ─────────────────────────────────────────────
+// LISTA DE ESCUELAS
+// ─────────────────────────────────────────────
+
+/** Lista paginada de escuelas con búsqueda. Caché de 3 minutos. */
+export const useListaEscuelas = (page: number, busqueda: string) => {
+  return useQuery({
+    queryKey: QUERY_KEYS.ESCUELAS_LISTA(page, busqueda),
+    queryFn: async () => {
+      const params: Record<string, any> = { page, limit: 10 };
+      if (busqueda) params.q = busqueda;
+      const response = await axiosInstance.get("/escuelas", { params });
+      return {
+        escuelas: response.data.data || [],
+        totalPages: Math.ceil((response.data.meta?.total || 10) / 10),
+      };
+    },
+    staleTime: 1000 * 60 * 3,
+    placeholderData: (prev) => prev,
   });
 };

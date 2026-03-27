@@ -1,6 +1,7 @@
 // src/pages/escuelas/ListaEscuelas.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Box,
   Typography,
@@ -43,6 +44,7 @@ import {
 } from '@mui/icons-material';
 import axiosInstance from '../../api/axiosConfig';
 import { useNotificacion } from '../../components/common/Notificaciones';
+import { useListaEscuelas, QUERY_KEYS } from '../../hooks/useAppQueries';
 
 // Interfaz para la escuela
 interface Escuela {
@@ -60,65 +62,36 @@ interface Escuela {
 
 const ListaEscuelas = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { mostrarNotificacion } = useNotificacion();
-  
-  // Estados
-  const [escuelas, setEscuelas] = useState<Escuela[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+
+  // Estados de UI
   const [busqueda, setBusqueda] = useState('');
+  const [busquedaAplicada, setBusquedaAplicada] = useState(''); // se actualiza al hacer clic en Buscar
   const [escuelaSeleccionada, setEscuelaSeleccionada] = useState<Escuela | null>(null);
   const [dialogEliminar, setDialogEliminar] = useState(false);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  
-  // Función para cargar escuelas
-  const cargarEscuelas = async (pagina = 1, terminoBusqueda = '') => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // Construir parámetros de consulta
-      const params: any = {
-        page: pagina,
-        limit: 10,
-      };
-      
-      if (terminoBusqueda) {
-        params.q = terminoBusqueda;
-      }
-      
-      const response = await axiosInstance.get('/escuelas', { params });
-      
-      setEscuelas(response.data.data || []);
-      setTotalPages(Math.ceil((response.data.meta?.total || 10) / 10));
-    } catch (err: any) {
-      console.error('Error al cargar escuelas:', err);
-      setError('No se pudieron cargar las escuelas. ' + (err.response?.data?.message || 'Error del servidor'));
-      setEscuelas([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  // Cargar escuelas al inicio
-  useEffect(() => {
-    cargarEscuelas(page, busqueda);
-  }, [page]);
-  
+
+  const { data: queryData, isLoading: loading, error: queryError } = useListaEscuelas(page, busquedaAplicada);
+  const escuelas: Escuela[] = (queryData?.escuelas as Escuela[]) || [];
+  const totalPages = queryData?.totalPages || 1;
+  const error = queryError
+    ? 'No se pudieron cargar las escuelas. ' + ((queryError as any)?.response?.data?.message || 'Error del servidor')
+    : null;
+
   // Manejar la búsqueda
   const handleBusqueda = () => {
-    setPage(1); // Resetear página al buscar
-    cargarEscuelas(1, busqueda);
+    setPage(1);
+    setBusquedaAplicada(busqueda);
   };
-  
+
   // Resetear búsqueda
   const resetBusqueda = () => {
     setBusqueda('');
+    setBusquedaAplicada('');
     setPage(1);
-    cargarEscuelas(1, '');
   };
-  
+
   // Manejar cambio de página
   const handlePageChange = (_event: React.ChangeEvent<unknown>, newPage: number) => {
     setPage(newPage);
@@ -138,22 +111,16 @@ const ListaEscuelas = () => {
   // Eliminar escuela
   const eliminarEscuela = async () => {
     if (!escuelaSeleccionada) return;
-    
+
     try {
       await axiosInstance.delete(`/escuelas/${escuelaSeleccionada._id}`);
-      
-      // Actualizar lista
-      setEscuelas(prev => prev.filter(e => e._id !== escuelaSeleccionada._id));
-      
-      // Notificar éxito
+      queryClient.invalidateQueries({ queryKey: ["escuelas-lista"] });
       mostrarNotificacion('Escuela desactivada exitosamente', 'success');
-      
-      // Cerrar diálogo
       cerrarDialogEliminar();
     } catch (err: any) {
       console.error('Error al eliminar escuela:', err);
       mostrarNotificacion(
-        'Error al desactivar la escuela: ' + (err.response?.data?.message || 'Error del servidor'), 
+        'Error al desactivar la escuela: ' + (err.response?.data?.message || 'Error del servidor'),
         'error'
       );
     }

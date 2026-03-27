@@ -1,5 +1,5 @@
 // src/screens/tareas/ListaEntregas.tsx
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   Box,
@@ -24,20 +24,16 @@ import {
 } from "@mui/icons-material";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import tareaService from "../../services/tareaService";
 import { Tarea, EntregaTarea } from "../../types/tarea.types";
 import EstadoBadge from "../../components/tareas/EstadoBadge";
 import useAuth from "../../hooks/useAuth";
+import tareaService from "../../services/tareaService"; // necesario para descargarArchivo
+import { useEntregas } from "../../hooks/useAppQueries";
 
 const ListaEntregas: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-
-  const [tarea, setTarea] = useState<Tarea | null>(null);
-  const [entregas, setEntregas] = useState<EntregaTarea[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
 
   const esDocente =
     user?.tipo === "ADMIN" ||
@@ -45,37 +41,12 @@ const ListaEntregas: React.FC = () => {
     user?.tipo === "RECTOR" ||
     user?.tipo === "COORDINADOR";
 
-  useEffect(() => {
-    if (id) {
-      cargarDatos();
-    }
-  }, [id]);
-
-  const cargarDatos = async () => {
-    if (!id) return;
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Cargar tarea
-      const tareaRes = await tareaService.obtenerTarea(id);
-      setTarea(tareaRes.data);
-
-      // Cargar entregas
-      const entregasRes = await tareaService.verEntregas(id);
-      setEntregas(entregasRes.data || []);
-
-      setLoading(false);
-    } catch (err: any) {
-      console.error("Error al cargar datos:", err);
-      setError(
-        err.response?.data?.message ||
-          "No se pudieron cargar las entregas. Intente nuevamente."
-      );
-      setLoading(false);
-    }
-  };
+  const { data: queryData, isLoading: loading, error: queryError } = useEntregas(id || "");
+  const tarea: Tarea | null = queryData?.tarea ?? null;
+  const entregas: EntregaTarea[] = queryData?.entregas ?? [];
+  const error = queryError
+    ? (queryError as any)?.response?.data?.message || "No se pudieron cargar las entregas. Intente nuevamente."
+    : null;
 
   const getNombreEstudiante = (entrega: EntregaTarea): string => {
     if (typeof entrega.estudianteId === "object") {
