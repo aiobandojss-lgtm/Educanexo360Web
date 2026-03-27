@@ -57,8 +57,8 @@ const CardEstudiante: React.FC<CardEstudianteProps> = ({
             sx={{
               width: 56,
               height: 56,
-              backgroundColor: "rgba(139, 92, 246, 0.1)",
-              color: "#8B5CF6",
+              backgroundColor: "rgba(5, 150, 105, 0.1)",
+              color: "#059669",
               fontSize: "1.5rem",
               fontWeight: "bold",
             }}

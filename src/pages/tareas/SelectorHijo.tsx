@@ -75,8 +75,8 @@ const CardEstudiante: React.FC<CardEstudianteProps> = ({
             width: 56,
             height: 56,
             borderRadius: "50%",
-            backgroundColor: "rgba(139, 92, 246, 0.1)",
-            color: "#8B5CF6",
+            backgroundColor: "rgba(5, 150, 105, 0.1)",
+            color: "#059669",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -236,7 +236,7 @@ const SelectorHijo: React.FC = () => {
         }}
       >
         <Box sx={{ textAlign: "center" }}>
-          <CircularProgress sx={{ color: "#8B5CF6", mb: 2 }} />
+          <CircularProgress sx={{ color: "#059669", mb: 2 }} />
           <Typography variant="body1" color="text.secondary">
             Cargando información...
           </Typography>
@@ -250,7 +250,7 @@ const SelectorHijo: React.FC = () => {
       <Paper
         elevation={0}
         sx={{
-          backgroundColor: "#8B5CF6",
+          backgroundColor: "#059669",
           color: "white",
           p: 3,
           mb: 4,

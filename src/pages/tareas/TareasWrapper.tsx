@@ -28,7 +28,7 @@ const TareasWrapper: React.FC = () => {
           height: "80vh",
         }}
       >
-        <CircularProgress sx={{ color: "#8B5CF6" }} />
+        <CircularProgress sx={{ color: "#059669" }} />
       </Box>
     );
   }
