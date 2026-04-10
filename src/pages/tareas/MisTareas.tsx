@@ -62,57 +62,9 @@ const MisTareas: React.FC = () => {
     ? "Esta vista es solo para estudiantes y acudientes"
     : null;
 
-  const { pendientes: tareasPendientes, entregadas: tareasEntregadas, calificadas: tareasCalificadas } = useMemo(() => {
-    const tareasData: Tarea[] = queryData?.tareasData || [];
-    return filtrarTareasPorEstado(tareasData);
-  }, [queryData?.tareasData]);
-
-  /**
-   * Filtrar tareas por estado de entrega
-   */
-  const filtrarTareasPorEstado = (tareas: Tarea[]) => {
-    const pendientes: Tarea[] = [];
-    const entregadas: Tarea[] = [];
-    const calificadas: Tarea[] = [];
-
-    tareas.forEach((tarea) => {
-      const entrega = getEntregaEstudiante(tarea);
-
-      if (!entrega) {
-        pendientes.push(tarea);
-      } else {
-        const estado = (entrega as any).estado;
-        const calificacion = (entrega as any).calificacion;
-
-        // Verificar si está calificada
-        if (estado === "CALIFICADA" || calificacion !== undefined) {
-          calificadas.push(tarea);
-        }
-        // Verificar si está entregada pero sin calificar
-        else if (estado === "ENTREGADA" || estado === "ATRASADA") {
-          entregadas.push(tarea);
-        }
-        // Pendiente o vista
-        else {
-          pendientes.push(tarea);
-        }
-      }
-    });
-
-    return { pendientes, entregadas, calificadas };
-  };
-
-  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
-    setTabValue(newValue);
-  };
-
-  const handleVolver = () => {
-    navigate("/tareas");
-  };
-
   /**
    * Función para obtener la entrega del estudiante actual de una tarea
-   * 
+   *
    * IMPORTANTE: El backend envía 3 formatos diferentes:
    * - Para "mis-tareas" (estudiante): tarea.miEntrega (objeto)
    * - Para "tareas/estudiante/:id" (acudiente): tarea.entregaEstudiante (objeto)
@@ -154,6 +106,54 @@ const MisTareas: React.FC = () => {
 
       return String(entregaEstudianteId) === String(targetEstudianteId);
     });
+  };
+
+  /**
+   * Filtrar tareas por estado de entrega
+   */
+  const filtrarTareasPorEstado = (tareas: Tarea[]) => {
+    const pendientes: Tarea[] = [];
+    const entregadas: Tarea[] = [];
+    const calificadas: Tarea[] = [];
+
+    tareas.forEach((tarea) => {
+      const entrega = getEntregaEstudiante(tarea);
+
+      if (!entrega) {
+        pendientes.push(tarea);
+      } else {
+        const estado = (entrega as any).estado;
+        const calificacion = (entrega as any).calificacion;
+
+        // Verificar si está calificada
+        if (estado === "CALIFICADA" || calificacion !== undefined) {
+          calificadas.push(tarea);
+        }
+        // Verificar si está entregada pero sin calificar
+        else if (estado === "ENTREGADA" || estado === "ATRASADA") {
+          entregadas.push(tarea);
+        }
+        // Pendiente o vista
+        else {
+          pendientes.push(tarea);
+        }
+      }
+    });
+
+    return { pendientes, entregadas, calificadas };
+  };
+
+  const { pendientes: tareasPendientes, entregadas: tareasEntregadas, calificadas: tareasCalificadas } = useMemo(() => {
+    const tareasData: Tarea[] = queryData?.tareasData || [];
+    return filtrarTareasPorEstado(tareasData);
+  }, [queryData?.tareasData]);
+
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
+  };
+
+  const handleVolver = () => {
+    navigate("/tareas");
   };
 
   if (loading) {
