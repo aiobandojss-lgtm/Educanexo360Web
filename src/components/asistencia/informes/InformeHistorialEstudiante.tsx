@@ -33,7 +33,7 @@ import {
 import { format, subMonths } from 'date-fns';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../../redux/store';
-import { useInformeHistorial, useEstudiantes, useEscuela } from '../../../hooks/useAppQueries';
+import { useInformeHistorial, useUsuarios, useEscuela } from '../../../hooks/useAppQueries';
 import type { ParamsHistorial } from '../../../services/asistenciaInformesService';
 import { generarPdfHistorial } from '../../../utils/pdfGenerators/pdfHistorial';
 
@@ -58,7 +58,7 @@ const InformeHistorialEstudiante: React.FC = () => {
   const [queryParams, setQueryParams] = useState<ParamsHistorial>(params);
   const [queryEstId, setQueryEstId] = useState<string>('');
 
-  const { data: usuariosData, isLoading: isLoadingEstudiantes, isError: isErrorEstudiantes } = useEstudiantes();
+  const { data: usuariosData, isLoading: isLoadingEstudiantes, isError: isErrorEstudiantes } = useUsuarios('ESTUDIANTE');
   // El endpoint puede devolver el array directamente o envuelto en { data: [...] }
   const estudiantes: any[] = Array.isArray(usuariosData)
     ? usuariosData
