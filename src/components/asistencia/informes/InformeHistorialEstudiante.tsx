@@ -58,8 +58,13 @@ const InformeHistorialEstudiante: React.FC = () => {
   const [queryParams, setQueryParams] = useState<ParamsHistorial>(params);
   const [queryEstId, setQueryEstId] = useState<string>('');
 
-  const { data: usuariosData } = useEstudiantes();
-  const estudiantes: any[] = Array.isArray(usuariosData) ? usuariosData : [];
+  const { data: usuariosData, isLoading: isLoadingEstudiantes, isError: isErrorEstudiantes } = useEstudiantes();
+  // El endpoint puede devolver el array directamente o envuelto en { data: [...] }
+  const estudiantes: any[] = Array.isArray(usuariosData)
+    ? usuariosData
+    : Array.isArray((usuariosData as any)?.data)
+    ? (usuariosData as any).data
+    : [];
 
   const { data, isLoading, isError } = useInformeHistorial(
     queryEstId,
@@ -114,17 +119,33 @@ const InformeHistorialEstudiante: React.FC = () => {
               value={estudianteSeleccionado}
               onChange={(_, val) => setEstudianteSeleccionado(val)}
               size="small"
+              loading={isLoadingEstudiantes}
+              noOptionsText={
+                isErrorEstudiantes
+                  ? 'Sin acceso a la lista de estudiantes'
+                  : isLoadingEstudiantes
+                  ? 'Cargando...'
+                  : 'Sin estudiantes'
+              }
               renderInput={(inputParams) => (
                 <TextField
                   {...inputParams}
                   label="Buscar estudiante"
                   placeholder="Nombre o apellido..."
+                  error={isErrorEstudiantes}
+                  helperText={isErrorEstudiantes ? 'No se pudo cargar la lista. Verifique permisos.' : undefined}
                   InputProps={{
                     ...inputParams.InputProps,
                     startAdornment: (
                       <>
                         <SearchIcon fontSize="small" sx={{ color: 'text.disabled', mr: 0.5 }} />
                         {inputParams.InputProps.startAdornment}
+                      </>
+                    ),
+                    endAdornment: (
+                      <>
+                        {isLoadingEstudiantes ? <CircularProgress color="inherit" size={16} /> : null}
+                        {inputParams.InputProps.endAdornment}
                       </>
                     ),
                   }}
