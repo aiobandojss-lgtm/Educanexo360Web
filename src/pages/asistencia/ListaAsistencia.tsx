@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { useAsistenciaCursos, useResumenAsistencia } from "../../hooks/useAppQueries";
+import axiosInstance from "../../api/axiosConfig";
 import {
   Box,
   Typography,
@@ -94,6 +95,14 @@ const ListaAsistencia = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
+  // Estado para ACUDIENTE: lista de hijos cargados con nombres reales
+  const [hijosUsuarios, setHijosUsuarios] = useState<{ _id: string; nombre: string; apellidos: string }[]>([]);
+  const [estudianteIdSeleccionado, setEstudianteIdSeleccionado] = useState<string>("");
+
+  const esEstudiante = user?.tipo === "ESTUDIANTE";
+  const esAcudiente = user?.tipo === "ACUDIENTE";
+  const esRolPersonal = esEstudiante || esAcudiente;
+
   // Hooks de caché
   const {
     data: cursosRaw,
@@ -106,10 +115,16 @@ const ListaAsistencia = () => {
     data: asistenciasRaw,
     isLoading: loading,
     error: errorAsistencias,
-  } = useResumenAsistencia(fechaInicio, fechaFin, cursoSeleccionado, user?.tipo || "");
+  } = useResumenAsistencia(
+    fechaInicio,
+    fechaFin,
+    cursoSeleccionado,
+    user?.tipo || "",
+    estudianteIdSeleccionado || undefined
+  );
   const asistencias: AsistenciaResumen[] = (asistenciasRaw as AsistenciaResumen[]) || [];
 
-  const error = errorCursos
+  const error = (!esRolPersonal && errorCursos)
     ? "No se pudieron cargar los cursos: " + ((errorCursos as any)?.response?.data?.message || "Error del servidor")
     : errorAsistencias
     ? "No se pudieron cargar las asistencias: " + ((errorAsistencias as any)?.response?.data?.message || "Error del servidor")
@@ -121,6 +136,31 @@ const ListaAsistencia = () => {
       setCursoSeleccionado(cursos[0]._id);
     }
   }, [cursos]);
+
+  // Para ESTUDIANTE: auto-asignar su propio ID
+  useEffect(() => {
+    if (esEstudiante && user?._id) {
+      setEstudianteIdSeleccionado(user._id);
+    }
+  }, [esEstudiante, user?._id]);
+
+  // Para ACUDIENTE: cargar nombres reales de hijos asociados
+  useEffect(() => {
+    if (!esAcudiente) return;
+    const hijosIds: string[] = user?.info_academica?.estudiantes_asociados ?? [];
+    if (hijosIds.length === 0) return;
+
+    setEstudianteIdSeleccionado(hijosIds[0]);
+
+    Promise.all(
+      hijosIds.map((id) =>
+        axiosInstance.get(`/usuarios/${id}`).then((res) => {
+          const data = res.data.data ?? res.data;
+          return { _id: data._id, nombre: data.nombre, apellidos: data.apellidos };
+        }).catch(() => ({ _id: id, nombre: "Estudiante", apellidos: "" }))
+      )
+    ).then(setHijosUsuarios);
+  }, [esAcudiente, user?.info_academica?.estudiantes_asociados]);
 
   // Filtro por curso
   const handleCursoChange = (event: SelectChangeEvent) => {
@@ -232,28 +272,69 @@ const ListaAsistencia = () => {
         sx={{ p: 3, mb: 3, boxShadow: "0px 4px 4px rgba(0, 0, 0, 0.05)" }}
       >
         <Grid container spacing={3} alignItems="center">
-          {/* Selector de curso */}
-          <Grid item xs={12} md={4}>
-            <FormControl fullWidth variant="outlined" size="small">
-              <InputLabel id="curso-label">Curso</InputLabel>
-              <Select
-                labelId="curso-label"
-                value={cursoSeleccionado}
-                onChange={handleCursoChange}
-                label="Curso"
-                disabled={loadingCursos || loading}
-              >
-                {user?.tipo === "ADMIN" && (
-                  <MenuItem value="">Todos los cursos</MenuItem>
-                )}
-                {cursos.map((curso) => (
-                  <MenuItem key={curso._id} value={curso._id}>
-                    {curso.nombre} - {curso.grado} {curso.grupo}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
+          {/* Selector de curso — solo para ADMIN, DOCENTE, RECTOR, COORDINADOR */}
+          {!esRolPersonal && (
+            <Grid item xs={12} md={4}>
+              <FormControl fullWidth variant="outlined" size="small">
+                <InputLabel id="curso-label">Curso</InputLabel>
+                <Select
+                  labelId="curso-label"
+                  value={cursoSeleccionado}
+                  onChange={handleCursoChange}
+                  label="Curso"
+                  disabled={loadingCursos || loading}
+                >
+                  {user?.tipo === "ADMIN" && (
+                    <MenuItem value="">Todos los cursos</MenuItem>
+                  )}
+                  {cursos.map((curso) => (
+                    <MenuItem key={curso._id} value={curso._id}>
+                      {curso.nombre} - {curso.grado} {curso.grupo}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+          )}
+
+          {/* Selector de hijo — solo ACUDIENTE con múltiples hijos */}
+          {esAcudiente && hijosUsuarios.length > 1 && (
+            <Grid item xs={12} md={4}>
+              <FormControl fullWidth variant="outlined" size="small">
+                <InputLabel id="hijo-label">Seleccionar hijo</InputLabel>
+                <Select
+                  labelId="hijo-label"
+                  value={estudianteIdSeleccionado}
+                  onChange={(e) => setEstudianteIdSeleccionado(e.target.value)}
+                  label="Seleccionar hijo"
+                >
+                  {hijosUsuarios.map((hijo) => (
+                    <MenuItem key={hijo._id} value={hijo._id}>
+                      {hijo.nombre} {hijo.apellidos}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+          )}
+
+          {/* Label informativo para ESTUDIANTE */}
+          {esEstudiante && (
+            <Grid item xs={12} md={4}>
+              <Alert severity="info" icon={false}>
+                Viendo tu propia asistencia
+              </Alert>
+            </Grid>
+          )}
+
+          {/* Label informativo para ACUDIENTE con 1 hijo */}
+          {esAcudiente && hijosUsuarios.length === 1 && (
+            <Grid item xs={12} md={4}>
+              <Alert severity="info" icon={false}>
+                Viendo asistencia de {hijosUsuarios[0].nombre} {hijosUsuarios[0].apellidos}
+              </Alert>
+            </Grid>
+          )}
 
           {/* Selector de fecha inicio */}
           <Grid item xs={12} md={4}>
@@ -440,20 +521,19 @@ const ListaAsistencia = () => {
               <TableRow>
                 <TableCell>Fecha</TableCell>
                 <TableCell>Curso</TableCell>
-                <TableCell align="center">Total Estudiantes</TableCell>
-                <TableCell align="center">Presentes</TableCell>
-                <TableCell align="center">Ausentes</TableCell>
+                {!esRolPersonal && <TableCell align="center">Total Estudiantes</TableCell>}
+                {!esRolPersonal && <TableCell align="center">Presentes</TableCell>}
+                {!esRolPersonal && <TableCell align="center">Ausentes</TableCell>}
                 <TableCell align="center">% Asistencia</TableCell>
-                <TableCell>Registrado Por</TableCell>
-                <TableCell align="center">Estado</TableCell>{" "}
-                {/* Columna añadida para estado */}
+                {!esRolPersonal && <TableCell>Registrado Por</TableCell>}
+                <TableCell align="center">Estado</TableCell>
                 <TableCell align="center">Acciones</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={9} align="center" sx={{ py: 3 }}>
+                  <TableCell colSpan={esRolPersonal ? 6 : 9} align="center" sx={{ py: 3 }}>
                     {" "}
                     {/* Actualizado colSpan a 9 */}
                     <CircularProgress size={30} />
@@ -461,7 +541,7 @@ const ListaAsistencia = () => {
                 </TableRow>
               ) : asistencias.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} align="center" sx={{ py: 3 }}>
+                  <TableCell colSpan={esRolPersonal ? 6 : 9} align="center" sx={{ py: 3 }}>
                     {" "}
                     {/* Actualizado colSpan a 9 */}
                     <Typography variant="body1" color="text.secondary">
@@ -491,41 +571,27 @@ const ListaAsistencia = () => {
                           {asistencia.curso.grado} {asistencia.curso.grupo}
                         </strong>
                       </TableCell>
-                      <TableCell align="center">
-                        {asistencia.totalEstudiantes}
-                      </TableCell>
-                      <TableCell align="center">
-                        {asistencia.presentes}
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                          sx={{ ml: 1 }}
-                        >
-                          (
-                          {Math.round(
-                            (asistencia.presentes /
-                              asistencia.totalEstudiantes) *
-                              100
-                          )}
-                          %)
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="center">
-                        {asistencia.ausentes}
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                          sx={{ ml: 1 }}
-                        >
-                          (
-                          {Math.round(
-                            (asistencia.ausentes /
-                              asistencia.totalEstudiantes) *
-                              100
-                          )}
-                          %)
-                        </Typography>
-                      </TableCell>
+                      {!esRolPersonal && (
+                        <TableCell align="center">
+                          {asistencia.totalEstudiantes}
+                        </TableCell>
+                      )}
+                      {!esRolPersonal && (
+                        <TableCell align="center">
+                          {asistencia.presentes}
+                          <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                            ({Math.round((asistencia.presentes / asistencia.totalEstudiantes) * 100)}%)
+                          </Typography>
+                        </TableCell>
+                      )}
+                      {!esRolPersonal && (
+                        <TableCell align="center">
+                          {asistencia.ausentes}
+                          <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                            ({Math.round((asistencia.ausentes / asistencia.totalEstudiantes) * 100)}%)
+                          </Typography>
+                        </TableCell>
+                      )}
                       <TableCell align="center">
                         <Chip
                           label={`${asistencia.porcentajeAsistencia}%`}
@@ -540,11 +606,12 @@ const ListaAsistencia = () => {
                           sx={{ borderRadius: 8 }}
                         />
                       </TableCell>
-                      <TableCell>
-                        {asistencia.registradoPor?.nombre || "Usuario"}{" "}
-                        {asistencia.registradoPor?.apellidos || ""}
-                      </TableCell>
-                      {/* Nueva celda para el estado */}
+                      {!esRolPersonal && (
+                        <TableCell>
+                          {asistencia.registradoPor?.nombre || "Usuario"}{" "}
+                          {asistencia.registradoPor?.apellidos || ""}
+                        </TableCell>
+                      )}
                       <TableCell align="center">
                         <Chip
                           label={
