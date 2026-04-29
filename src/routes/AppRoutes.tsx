@@ -45,6 +45,10 @@ const ListaUsuarios = lazy(() => import("../pages/usuarios/ListaUsuarios"));
 const DetalleUsuario = lazy(() => import("../pages/usuarios/DetalleUsuario"));
 const CambiarPassword = lazy(() => import("../pages/usuarios/CambiarPassword"));
 
+// Perfiles de Rol (solo ADMIN)
+const ListaPerfilesRol = lazy(() => import("../pages/perfiles-rol/ListaPerfilesRol"));
+const FormularioPerfilRol = lazy(() => import("../pages/perfiles-rol/FormularioPerfilRol"));
+
 // Cursos
 const ListaCursos = lazy(() => import("../pages/cursos/ListaCursos"));
 const DetalleCurso = lazy(() => import("../pages/cursos/DetalleCurso"));
@@ -79,6 +83,7 @@ const FormularioAnuncio = lazy(() => import("../pages/anuncios/FormularioAnuncio
 const ListaAsistencia = lazy(() => import("../pages/asistencia/ListaAsistencia"));
 const RegistroAsistencia = lazy(() => import("../pages/asistencia/RegistroAsistencia"));
 const DetalleAsistencia = lazy(() => import("../pages/asistencia/DetalleAsistencia"));
+const InformesAsistencia = lazy(() => import("../pages/asistencia/InformesAsistencia"));
 
 // Tareas
 const MisTareas = lazy(() => import("../pages/tareas/MisTareas"));
@@ -321,6 +326,32 @@ const AppRoutes = () => {
             }
           />
 
+          {/* Perfiles de Rol — solo ADMIN */}
+          <Route
+            path="perfiles-rol"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}>
+                <ListaPerfilesRol />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="perfiles-rol/nuevo"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}>
+                <FormularioPerfilRol />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="perfiles-rol/editar/:id"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}>
+                <FormularioPerfilRol />
+              </ProtectedRoute>
+            }
+          />
+
           {/* Cursos */}
           <Route
             path="cursos"
@@ -443,7 +474,7 @@ const AppRoutes = () => {
           <Route
             path="asistencia"
             element={
-              <ProtectedRoute allowedRoles={["ADMIN", "DOCENTE", "COORDINADOR", "RECTOR", "ADMINISTRATIVO"]}>
+              <ProtectedRoute allowedRoles={["ADMIN", "DOCENTE", "COORDINADOR", "RECTOR", "ADMINISTRATIVO", "ESTUDIANTE", "ACUDIENTE"]}>
                 <ListaAsistencia />
               </ProtectedRoute>
             }
@@ -459,7 +490,7 @@ const AppRoutes = () => {
           <Route
             path="asistencia/:id"
             element={
-              <ProtectedRoute allowedRoles={["ADMIN", "DOCENTE", "COORDINADOR", "RECTOR", "ADMINISTRATIVO"]}>
+              <ProtectedRoute allowedRoles={["ADMIN", "DOCENTE", "COORDINADOR", "RECTOR", "ADMINISTRATIVO", "ESTUDIANTE", "ACUDIENTE"]}>
                 <DetalleAsistencia />
               </ProtectedRoute>
             }
@@ -469,6 +500,15 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute allowedRoles={["ADMIN", "DOCENTE", "COORDINADOR", "RECTOR", "ADMINISTRATIVO"]}>
                 <RegistroAsistencia />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="asistencia/informes"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN", "DOCENTE", "COORDINADOR", "RECTOR", "ADMINISTRATIVO"]}>
+                <InformesAsistencia />
               </ProtectedRoute>
             }
           />
