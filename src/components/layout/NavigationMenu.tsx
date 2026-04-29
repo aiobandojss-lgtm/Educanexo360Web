@@ -35,6 +35,8 @@ import {
   Mail,
   UserPlus,
   CheckSquare,
+  ShieldCheck,
+  BarChart2,
 } from "lucide-react";
 import { RootState } from "../../redux/store";
 
@@ -203,6 +205,12 @@ const NavigationMenu: React.FC = () => {
       allowedRoles: ["ADMIN", "COORDINADOR", "RECTOR"],
     },
     {
+      title: "Perfiles de Rol",
+      icon: <ShieldCheck {...iconProps} />,
+      path: "/perfiles-rol",
+      allowedRoles: ["ADMIN"],
+    },
+    {
       title: "Cursos",
       icon: <BookOpen {...iconProps} />,
       path: "/cursos",
@@ -278,7 +286,25 @@ const NavigationMenu: React.FC = () => {
             "ADMINISTRATIVO",
           ],
         },
+        {
+          title: "Informes",
+          icon: <BarChart2 {...iconProps} />,
+          path: "/asistencia/informes",
+          allowedRoles: [
+            "ADMIN",
+            "DOCENTE",
+            "COORDINADOR",
+            "RECTOR",
+            "ADMINISTRATIVO",
+          ],
+        },
       ],
+    },
+    {
+      title: "Mi Asistencia",
+      icon: <ClipboardCheck {...iconProps} />,
+      path: "/asistencia",
+      allowedRoles: ["ESTUDIANTE", "ACUDIENTE"],
     },
     {
       title: "Calendario Escolar",
