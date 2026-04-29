@@ -20,6 +20,18 @@ import invitacionService from "../services/invitacionService";
 import asignaturaService from "../services/asignaturaService";
 import mensajeService from "../services/mensajeService";
 import asistenciaService from "../services/asistenciaService";
+import {
+  getInformeRiesgo,
+  getInformeTendencia,
+  getInformeRankingCursos,
+  getInformePatronDias,
+  getInformeHistorial,
+  type ParamsRiesgo,
+  type ParamsTendencia,
+  type ParamsRanking,
+  type ParamsPatronDias,
+  type ParamsHistorial,
+} from "../services/asistenciaInformesService";
 import axiosInstance from "../api/axiosConfig";
 import { extraerIdComoString } from "../utils/mongoUtils";
 import API_ROUTES from "../constants/apiRoutes";
@@ -48,6 +60,13 @@ export const QUERY_KEYS = {
   LISTA_ENTREGAS: (tareaId: string) => ["lista-entregas", tareaId],
   DETALLE_USUARIO: (id: string) => ["usuario-detalle", id],
   ESCUELAS_LISTA: (page: number, q: string) => ["escuelas-lista", page, q],
+  PERFILES_ROL: ["perfiles-rol"],
+  CATALOGO_PERMISOS: ["catalogo-permisos"],
+  INFORME_RIESGO: (params: ParamsRiesgo) => ["informe-riesgo", params],
+  INFORME_TENDENCIA: (params: ParamsTendencia) => ["informe-tendencia", params],
+  INFORME_RANKING: (params: ParamsRanking) => ["informe-ranking", params],
+  INFORME_PATRON_DIAS: (params: ParamsPatronDias) => ["informe-patron-dias", params],
+  INFORME_HISTORIAL: (estudianteId: string, params: ParamsHistorial) => ["informe-historial", estudianteId, params],
 } as const;
 
 // ─────────────────────────────────────────────
@@ -80,12 +99,15 @@ export const useEscuela = () => {
 // CURSOS
 // ─────────────────────────────────────────────
 
-/** Lista de cursos. Caché de 5 minutos. */
+/** Lista de cursos. Caché de 5 minutos, aislada por usuario para evitar que un DOCENTE
+ *  contamine la vista del ADMIN con sus cursos filtrados. */
 export const useCursos = () => {
+  const { user } = useSelector((state: RootState) => state.auth);
   return useQuery({
-    queryKey: QUERY_KEYS.CURSOS,
+    queryKey: [...QUERY_KEYS.CURSOS, user?._id],
     queryFn: () => cursoService.obtenerCursos(),
     staleTime: 1000 * 60 * 5,
+    enabled: !!user,
   });
 };
 
@@ -109,6 +131,15 @@ export const useUsuarios = (tipo?: string) => {
     queryKey: QUERY_KEYS.USUARIOS(tipo),
     queryFn: () => usuarioService.obtenerUsuarios(tipo ? { tipo } : {}),
     staleTime: 1000 * 60 * 3,
+  });
+};
+
+/** Lista de estudiantes — usa GET /usuarios/estudiantes (accesible para ADMIN y DOCENTE). */
+export const useEstudiantes = () => {
+  return useQuery({
+    queryKey: ['estudiantes-lista'],
+    queryFn: () => usuarioService.obtenerEstudiantes(),
+    staleTime: 1000 * 60 * 5,
   });
 };
 
@@ -326,27 +357,38 @@ export const useMensajes = (bandeja: string, userId: string, puedeTenerBorradore
 /** Cursos disponibles para registro de asistencia. Caché de 10 minutos. */
 export const useAsistenciaCursos = () => {
   const { user } = useSelector((state: RootState) => state.auth);
+  const esRolPersonal = user?.tipo === "ESTUDIANTE" || user?.tipo === "ACUDIENTE";
   return useQuery({
     queryKey: QUERY_KEYS.ASISTENCIA_CURSOS,
     queryFn: () => asistenciaService.obtenerCursosDisponibles(),
     staleTime: 1000 * 60 * 10,
-    enabled: !!user,
+    enabled: !!user && !esRolPersonal,
   });
 };
 
-/** Resumen de asistencia filtrado por rango de fechas y curso. */
+/** Resumen de asistencia filtrado por rango de fechas y curso (o estudiante para roles personales). */
 export const useResumenAsistencia = (
   fechaInicio: string,
   fechaFin: string,
   cursoSeleccionado: string,
-  userTipo: string
+  userTipo: string,
+  estudianteId?: string
 ) => {
+  const esRolPersonal = userTipo === "ESTUDIANTE" || userTipo === "ACUDIENTE";
+
   return useQuery({
-    queryKey: QUERY_KEYS.ASISTENCIA_RESUMEN(fechaInicio, fechaFin, cursoSeleccionado),
+    queryKey: [...QUERY_KEYS.ASISTENCIA_RESUMEN(fechaInicio, fechaFin, cursoSeleccionado), estudianteId ?? ""],
     queryFn: () =>
-      asistenciaService.obtenerResumenAsistencia(fechaInicio, fechaFin, cursoSeleccionado),
+      asistenciaService.obtenerResumenAsistencia(
+        fechaInicio,
+        fechaFin,
+        esRolPersonal ? undefined : cursoSeleccionado,
+        estudianteId
+      ),
     staleTime: 1000 * 60 * 2,
-    enabled: !!(cursoSeleccionado || ["ADMIN", "DOCENTE"].includes(userTipo)),
+    enabled: esRolPersonal
+      ? !!estudianteId
+      : !!(cursoSeleccionado || ["ADMIN", "DOCENTE", "RECTOR", "COORDINADOR"].includes(userTipo)),
   });
 };
 
@@ -517,5 +559,88 @@ export const useListaEscuelas = (page: number, busqueda: string) => {
     },
     staleTime: 1000 * 60 * 3,
     placeholderData: (prev) => prev,
+  });
+};
+
+// ─────────────────────────────────────────────
+// PERFILES DE ROL
+// ─────────────────────────────────────────────
+
+/** Lista todos los perfiles de rol activos de la escuela. Caché de 5 minutos. */
+export const usePerfilesRol = (enabled = true) => {
+  return useQuery({
+    queryKey: QUERY_KEYS.PERFILES_ROL,
+    queryFn: async () => {
+      const response = await axiosInstance.get("/perfiles-rol");
+      return response.data.data || [];
+    },
+    staleTime: 1000 * 60 * 5,
+    enabled,
+  });
+};
+
+/** Catálogo completo de permisos disponibles en el sistema. Caché de 10 minutos — rara vez cambia. */
+export const useCatalogoPermisos = () => {
+  return useQuery({
+    queryKey: QUERY_KEYS.CATALOGO_PERMISOS,
+    queryFn: async () => {
+      const response = await axiosInstance.get("/perfiles-rol/catalogo/permisos");
+      return response.data.data || [];
+    },
+    staleTime: 1000 * 60 * 10,
+  });
+};
+
+// ─────────────────────────────────────────────
+// INFORMES DE ASISTENCIA
+// ─────────────────────────────────────────────
+
+/** Informe de estudiantes en riesgo de inasistencia. */
+export const useInformeRiesgo = (params: ParamsRiesgo, enabled = true) => {
+  return useQuery({
+    queryKey: QUERY_KEYS.INFORME_RIESGO(params),
+    queryFn: () => getInformeRiesgo(params),
+    staleTime: 1000 * 60 * 3,
+    enabled,
+  });
+};
+
+/** Informe de tendencia de asistencia en el tiempo. */
+export const useInformeTendencia = (params: ParamsTendencia, enabled = true) => {
+  return useQuery({
+    queryKey: QUERY_KEYS.INFORME_TENDENCIA(params),
+    queryFn: () => getInformeTendencia(params),
+    staleTime: 1000 * 60 * 3,
+    enabled,
+  });
+};
+
+/** Ranking de cursos por porcentaje de asistencia. */
+export const useInformeRankingCursos = (params: ParamsRanking, enabled = true) => {
+  return useQuery({
+    queryKey: QUERY_KEYS.INFORME_RANKING(params),
+    queryFn: () => getInformeRankingCursos(params),
+    staleTime: 1000 * 60 * 3,
+    enabled,
+  });
+};
+
+/** Patrón de inasistencia por día de la semana. */
+export const useInformePatronDias = (params: ParamsPatronDias, enabled = true) => {
+  return useQuery({
+    queryKey: QUERY_KEYS.INFORME_PATRON_DIAS(params),
+    queryFn: () => getInformePatronDias(params),
+    staleTime: 1000 * 60 * 3,
+    enabled,
+  });
+};
+
+/** Historial completo de asistencia de un estudiante. */
+export const useInformeHistorial = (estudianteId: string, params: ParamsHistorial, enabled = true) => {
+  return useQuery({
+    queryKey: QUERY_KEYS.INFORME_HISTORIAL(estudianteId, params),
+    queryFn: () => getInformeHistorial(estudianteId, params),
+    staleTime: 1000 * 60 * 3,
+    enabled: enabled && !!estudianteId,
   });
 };
