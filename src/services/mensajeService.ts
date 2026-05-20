@@ -224,76 +224,59 @@ const responderMensaje = async (
 
 // Enviar mensaje masivo
 const enviarMensajeMasivo = async (
-  cursoId: string,
+  cursoIds: string[],
   asunto: string,
   contenido: string,
   prioridad: string,
   adjuntos: File[] = []
 ) => {
   try {
-    console.log("Preparando mensaje masivo para el curso:", cursoId);
+    console.log("Preparando mensaje masivo para los cursos:", cursoIds);
 
-    // Si no hay adjuntos, usamos JSON normal
     if (adjuntos.length === 0) {
       const response = await axiosInstance.post("/mensajes", {
-        cursoIds: [cursoId], // Como array
+        cursoIds,
         asunto,
         contenido,
         prioridad,
-        tipo: TipoMensaje.GRUPAL, // Usar GRUPAL en lugar de MASIVO
+        tipo: TipoMensaje.GRUPAL,
       });
       return response.data;
     }
 
-    // Con adjuntos usamos FormData
     const formData = new FormData();
-
-    // Usar 'cursoIds' como array
-    formData.append("cursoIds", cursoId);
-
+    cursoIds.forEach((id) => formData.append("cursoIds", id));
     formData.append("asunto", asunto);
     formData.append("contenido", contenido);
     formData.append("tipo", TipoMensaje.GRUPAL);
     formData.append("prioridad", prioridad);
-
-    // Agregar adjuntos
     adjuntos.forEach((file) => {
       formData.append("adjuntos", file);
     });
 
     const response = await axiosFileInstance.post("/mensajes", formData);
-
     return response.data;
   } catch (error: any) {
     console.error("[Frontend] Error enviando mensaje masivo:", error);
 
-    // Mejorar el manejo de errores para mostrar el mensaje exacto
     if (error.response?.status === 404) {
       throw new Error("Ruta no encontrada");
     } else if (error.response?.status === 400) {
       if (error.response.data?.message) {
         throw new Error(error.response.data.message);
       } else {
-        throw new Error(
-          "El servidor rechazó la solicitud. Verifique los datos."
-        );
+        throw new Error("El servidor rechazó la solicitud. Verifique los datos.");
       }
     } else if (error.response?.status === 403) {
       throw new Error("No tiene permisos para enviar mensajes masivos.");
     } else if (error.response?.status === 500) {
-      // Para errores de servidor, intentar extraer el mensaje específico
       const errorText =
         error.response.data?.message ||
         (typeof error.response.data === "string" ? error.response.data : null);
-
       if (errorText && errorText.includes("not a valid enum value")) {
-        throw new Error(
-          `Error de validación: El tipo de mensaje no es válido. ${errorText}`
-        );
+        throw new Error(`Error de validación: El tipo de mensaje no es válido. ${errorText}`);
       } else {
-        throw new Error(
-          "Error interno del servidor. Por favor contacte al administrador."
-        );
+        throw new Error("Error interno del servidor. Por favor contacte al administrador.");
       }
     } else {
       throw error;
