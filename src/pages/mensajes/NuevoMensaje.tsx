@@ -116,6 +116,7 @@ const NuevoMensaje: React.FC = () => {
   const [exito, setExito] = useState<string | null>(null);
   const [tipoMensaje, setTipoMensaje] = useState<string>(TIPOS_MENSAJE.INDIVIDUAL);
   const [query, setQuery] = useState<string>('');
+  const [inputValueDestinatario, setInputValueDestinatario] = useState<string>('');
   const [isAcudiente, setIsAcudiente] = useState<boolean>(false);
   const [destinatariosCargados, setDestinatariosCargados] = useState<boolean>(false);
   
@@ -420,6 +421,8 @@ const NuevoMensaje: React.FC = () => {
         value._id
       ]);
     }
+    // Limpiar el campo de búsqueda al seleccionar
+    setInputValueDestinatario('');
     // No limpiar el query para acudientes
     if (!isAcudiente) {
       setQuery('');
@@ -596,8 +599,14 @@ const NuevoMensaje: React.FC = () => {
                       options={destinatarios}
                       getOptionLabel={(option) => getDestinatarioLabel(option)}
                       loading={buscando}
+                      inputValue={inputValueDestinatario}
                       onChange={handleDestinatarioSeleccionado}
-                      onInputChange={(_, value) => !isAcudiente && setQuery(value)}
+                      onInputChange={(_, value, reason) => {
+                        if (reason !== 'reset') {
+                          setInputValueDestinatario(value);
+                          if (!isAcudiente) setQuery(value);
+                        }
+                      }}
                       noOptionsText={isAcudiente ? 
                         "No hay destinatarios disponibles" : 
                         (query.trim() ? "No se encontraron destinatarios" : "Escriba para buscar")}
