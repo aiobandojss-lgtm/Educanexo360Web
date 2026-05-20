@@ -107,6 +107,7 @@ const NuevoMensaje: React.FC = () => {
   const [destinatarios, setDestinatarios] = useState<Usuario[]>([]);
   const [destinatariosSeleccionados, setDestinatariosSeleccionados] = useState<Usuario[]>([]);
   const [cursos, setCursos] = useState<Curso[]>([]);
+  const [cursosSeleccionados, setCursosSeleccionados] = useState<Curso[]>([]);
   const [adjuntos, setAdjuntos] = useState<File[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [buscando, setBuscando] = useState<boolean>(false);
@@ -152,7 +153,7 @@ const NuevoMensaje: React.FC = () => {
     ...(tipoMensaje === TIPOS_MENSAJE.INDIVIDUAL ? {
       destinatarios: Yup.array().min(1, 'Debe seleccionar al menos un destinatario')
     } : {
-      cursoId: Yup.string().required('Debe seleccionar un curso')
+      cursoIds: Yup.array().min(1, 'Debe seleccionar al menos un curso')
     }),
     prioridad: Yup.string().required('Seleccione la prioridad del mensaje')
   });
@@ -162,7 +163,7 @@ const NuevoMensaje: React.FC = () => {
       destinatarios: [] as string[],
       asunto: '',
       contenido: '',
-      cursoId: '',
+      cursoIds: [] as string[],
       prioridad: 'NORMAL' as 'ALTA' | 'NORMAL' | 'BAJA'
     },
     validationSchema,
@@ -194,7 +195,7 @@ const NuevoMensaje: React.FC = () => {
         } else {
           // Enviar mensaje masivo
           await mensajeService.enviarMensajeMasivo(
-            values.cursoId,
+            values.cursoIds,
             values.asunto,
             values.contenido,
             values.prioridad,
@@ -428,7 +429,8 @@ const NuevoMensaje: React.FC = () => {
     
     // Limpiar selecciones previas
     if (nuevoTipo === TIPOS_MENSAJE.INDIVIDUAL) {
-      formik.setFieldValue('cursoId', '');
+      formik.setFieldValue('cursoIds', []);
+      setCursosSeleccionados([]);
     } else {
       formik.setFieldValue('destinatarios', []);
       setDestinatariosSeleccionados([]);
@@ -672,55 +674,69 @@ const NuevoMensaje: React.FC = () => {
               </Grid>
             ) : (
               <Grid item xs={12}>
-                <FormControl 
-                  fullWidth 
-                  error={formik.touched.cursoId && Boolean(formik.errors.cursoId)}
-                >
-                  <InputLabel id="curso-label">Curso</InputLabel>
-                  <Select
-                    labelId="curso-label"
-                    id="cursoId"
-                    name="cursoId"
-                    value={formik.values.cursoId}
-                    onChange={formik.handleChange}
-                    onBlur={formik.handleBlur}
-                    label="Curso"
-                    disabled={loading}
-                    renderValue={(value) => {
-                      const curso = cursos.find(c => c._id === value);
-                      return curso ? `${curso.nombre} (${curso.cantidadEstudiantes} estudiantes)` : '';
-                    }}
-                  >
-                    {cursos.length > 0 ? (
-                        cursos.map((curso) => (
-                          <MenuItem key={curso._id} value={curso._id}>
-                            <Box>
-                              <Typography variant="body1">
-                                {curso.nombre}
-                                <Typography component="span" color="primary.main">
-                                  {` (${curso.cantidadEstudiantes} estudiantes)`}
-                                </Typography>
-                              </Typography>
-                              {curso.infoAdicional && (
-                                <Typography variant="body2" color="text.secondary">
-                                  {curso.infoAdicional}
-                                </Typography>
-                              )}
-                            </Box>
-                          </MenuItem>
-                        ))
-                      ) : (
-                        <MenuItem disabled value="">
-                          No hay cursos disponibles
-                        </MenuItem>
-                      )}
-                  </Select>
-                  {formik.touched.cursoId && formik.errors.cursoId && (
-                    <FormHelperText error>
-                      {formik.errors.cursoId}
-                    </FormHelperText>
+                <Typography variant="subtitle1" gutterBottom>
+                  Cursos destinatarios
+                </Typography>
+
+                <Autocomplete
+                  multiple
+                  id="cursos-autocomplete"
+                  options={cursos.filter(c => !formik.values.cursoIds.includes(c._id))}
+                  getOptionLabel={(option) =>
+                    `${option.nombre} (${option.cantidadEstudiantes} estudiantes)`
+                  }
+                  value={cursosSeleccionados}
+                  onChange={(_event, newValue) => {
+                    setCursosSeleccionados(newValue);
+                    formik.setFieldValue('cursoIds', newValue.map(c => c._id));
+                  }}
+                  disabled={loading}
+                  noOptionsText="No hay más cursos disponibles"
+                  renderTags={(value, getTagProps) =>
+                    value.map((curso, index) => {
+                      const tagProps = getTagProps({ index });
+                      return (
+                        <Chip
+                          {...tagProps}
+                          label={`${curso.nombre} (${curso.cantidadEstudiantes} est.)`}
+                          color="primary"
+                          variant="outlined"
+                        />
+                      );
+                    })
+                  }
+                  renderOption={(props, option) => (
+                    <li {...props} key={option._id}>
+                      <Box>
+                        <Typography variant="body1">{option.nombre}</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {option.cantidadEstudiantes} estudiantes
+                          {option.infoAdicional ? ` · ${option.infoAdicional}` : ''}
+                        </Typography>
+                      </Box>
+                    </li>
                   )}
-                </FormControl>
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Buscar curso"
+                      placeholder={cursosSeleccionados.length === 0 ? "Buscar y seleccionar cursos..." : ""}
+                      error={formik.touched.cursoIds && Boolean(formik.errors.cursoIds)}
+                      helperText={
+                        formik.touched.cursoIds && formik.errors.cursoIds
+                          ? (formik.errors.cursoIds as string)
+                          : undefined
+                      }
+                    />
+                  )}
+                  sx={{ mb: 1 }}
+                />
+
+                {cursosSeleccionados.length > 0 && (
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                    📊 {cursosSeleccionados.length} curso{cursosSeleccionados.length !== 1 ? 's' : ''} seleccionado{cursosSeleccionados.length !== 1 ? 's' : ''} · {cursosSeleccionados.reduce((sum, c) => sum + (c.cantidadEstudiantes ?? 0), 0)} estudiantes en total
+                  </Typography>
+                )}
               </Grid>
             )}
             
