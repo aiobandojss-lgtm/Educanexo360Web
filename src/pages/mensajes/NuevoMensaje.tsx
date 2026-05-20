@@ -29,6 +29,7 @@ import {
   RadioGroup,
   Autocomplete,
   FormHelperText,
+  Tooltip,
 } from '@mui/material';
 import {
   Send as SendIcon,
@@ -123,12 +124,28 @@ const NuevoMensaje: React.FC = () => {
   const [respondiendo, setRespondiendo] = useState<boolean>(false);
   
   // Determinar si el usuario puede enviar mensajes masivos
-  const puedeEnviarMasivo = user?.tipo === USER_ROLES.ADMIN || 
-                           user?.tipo === USER_ROLES.RECTOR || 
-                           user?.tipo === USER_ROLES.COORDINADOR || 
-                           user?.tipo === USER_ROLES.ADMINISTRATIVO || 
+  const puedeEnviarMasivo = user?.tipo === USER_ROLES.ADMIN ||
+                           user?.tipo === USER_ROLES.RECTOR ||
+                           user?.tipo === USER_ROLES.COORDINADOR ||
+                           user?.tipo === USER_ROLES.ADMINISTRATIVO ||
                            user?.tipo === USER_ROLES.DOCENTE;
-  
+
+  // Solo admins/directivos pueden seleccionar todo el colegio
+  const puedeSeleccionarTodo = user?.tipo === USER_ROLES.ADMIN ||
+                               user?.tipo === USER_ROLES.RECTOR ||
+                               user?.tipo === USER_ROLES.COORDINADOR ||
+                               user?.tipo === USER_ROLES.ADMINISTRATIVO;
+
+  const handleSeleccionarTodos = () => {
+    if (cursosSeleccionados.length === cursos.length && cursos.length > 0) {
+      setCursosSeleccionados([]);
+      formik.setFieldValue('cursoIds', []);
+    } else {
+      setCursosSeleccionados(cursos);
+      formik.setFieldValue('cursoIds', cursos.map(c => c._id));
+    }
+  };
+
   // Detectar si el usuario es ACUDIENTE o ESTUDIANTE
   useEffect(() => {
     if (user?.tipo === 'ACUDIENTE' || user?.tipo === 'ESTUDIANTE') {
@@ -674,9 +691,26 @@ const NuevoMensaje: React.FC = () => {
               </Grid>
             ) : (
               <Grid item xs={12}>
-                <Typography variant="subtitle1" gutterBottom>
-                  Cursos destinatarios
-                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="subtitle1">
+                    Cursos destinatarios
+                  </Typography>
+                  {puedeSeleccionarTodo && cursos.length > 0 && (
+                    <Tooltip title={cursosSeleccionados.length === cursos.length ? 'Deseleccionar todos los cursos' : 'Seleccionar todos los cursos del colegio'}>
+                      <Button
+                        size="small"
+                        variant={cursosSeleccionados.length === cursos.length ? 'contained' : 'outlined'}
+                        color="primary"
+                        startIcon={<SchoolIcon />}
+                        onClick={handleSeleccionarTodos}
+                        disabled={loading}
+                        sx={{ textTransform: 'none' }}
+                      >
+                        {cursosSeleccionados.length === cursos.length ? 'Quitar todo el colegio' : 'Todo el colegio'}
+                      </Button>
+                    </Tooltip>
+                  )}
+                </Box>
 
                 <Autocomplete
                   multiple
