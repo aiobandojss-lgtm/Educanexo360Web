@@ -26,11 +26,13 @@ import {
   getInformeRankingCursos,
   getInformePatronDias,
   getInformeHistorial,
+  getAlertasAsistencia,
   type ParamsRiesgo,
   type ParamsTendencia,
   type ParamsRanking,
   type ParamsPatronDias,
   type ParamsHistorial,
+  type ParamsAlertasAsistencia,
 } from "../services/asistenciaInformesService";
 import axiosInstance from "../api/axiosConfig";
 import { extraerIdComoString } from "../utils/mongoUtils";
@@ -67,6 +69,7 @@ export const QUERY_KEYS = {
   INFORME_RANKING: (params: ParamsRanking) => ["informe-ranking", params],
   INFORME_PATRON_DIAS: (params: ParamsPatronDias) => ["informe-patron-dias", params],
   INFORME_HISTORIAL: (estudianteId: string, params: ParamsHistorial) => ["informe-historial", estudianteId, params],
+  ALERTAS_ASISTENCIA: (params: ParamsAlertasAsistencia) => ["alertas-asistencia", params],
 } as const;
 
 // ─────────────────────────────────────────────
@@ -642,5 +645,15 @@ export const useInformeHistorial = (estudianteId: string, params: ParamsHistoria
     queryFn: () => getInformeHistorial(estudianteId, params),
     staleTime: 1000 * 60 * 3,
     enabled: enabled && !!estudianteId,
+  });
+};
+
+/** Alertas automáticas de asistencia enviadas por umbral de ausentismo. */
+export const useAlertasAsistencia = (params: ParamsAlertasAsistencia = {}, enabled = true) => {
+  return useQuery({
+    queryKey: QUERY_KEYS.ALERTAS_ASISTENCIA(params),
+    queryFn: () => getAlertasAsistencia(params),
+    staleTime: 1000 * 60 * 5,
+    enabled,
   });
 };

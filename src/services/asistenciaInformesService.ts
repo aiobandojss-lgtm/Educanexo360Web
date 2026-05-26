@@ -185,5 +185,29 @@ export const getResumenPeriodo = async (
     `/asistencia/resumen/periodo/${periodoId}`,
     { params: { cursoId } }
   );
-  return response.data.data;
+  return response.data.data.estudiantes ?? [];
+};
+
+export interface AlertaAsistencia {
+  _id: string;
+  estudianteId: { _id: string; nombre: string; apellidos: string };
+  cursoId: { _id: string; nombre: string };
+  nivel: 'ALERTA' | 'CRITICO' | 'INMINENTE';
+  porcentajeAusencias: number;
+  periodoId: string;
+  fechaEnvio: string;
+}
+
+export interface ParamsAlertasAsistencia {
+  cursoId?: string;
+  estudianteId?: string;
+  nivel?: string;
+  periodoId?: string;
+}
+
+export const getAlertasAsistencia = async (
+  params: ParamsAlertasAsistencia
+): Promise<AlertaAsistencia[]> => {
+  const response = await axiosInstance.get('/asistencia/alertas', { params });
+  return response.data.data ?? [];
 };
