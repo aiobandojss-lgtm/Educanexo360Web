@@ -53,7 +53,7 @@ GET /api/mensajes/estadisticas-docentes
 **Lógica de negocio:**
 - El punto de partida es la colección de **usuarios con tipo `DOCENTE`** de la escuela — NO la colección de mensajes. Esto garantiza que los docentes que enviaron **0 mensajes** en el periodo también aparezcan en la respuesta (son los más importantes para el rector).
 - Hacer un `$lookup` (left join) desde usuarios hacia mensajes, filtrando por rango de fechas, excluyendo `esCopiaAcudiente === true` y excluyendo tipo `BORRADOR`.
-- Para cada docente, incluir el array de cursos que dicta (desde `info_academica.cursos` del usuario).
+- Para cada docente, obtener los cursos que dicta desde `info_academica.asignaturas_asignadas[].cursoId` (extraer los `cursoId` distintos y hacer lookup a la colección `Curso` para obtener el nombre). La respuesta al frontend es `cursos: [{ _id, nombre }]`.
 - Ordenar: primero los que tienen `count === 0` (mayor urgencia), luego por `count` ascendente.
 
 **Respuesta esperada:**
@@ -129,8 +129,9 @@ GET /api/mensajes/auditoria
 - Filtrar por rango de fechas `createdAt` entre `desde` y `hasta`
 - Excluir `esCopiaAcudiente === true`
 - Excluir tipo `BORRADOR`
-- Para mensajes de tipo `GRUPAL`/`MASIVO`: incluir nombre del curso y cantidad de destinatarios estudiantes (excluir acudientes del conteo de destinatarios)
-- Para mensajes `INDIVIDUAL`: incluir nombre completo del destinatario
+- `tipo === 'INDIVIDUAL'`: incluir `destinatario: { _id, nombre, apellidos }` (el estudiante destinatario)
+- `tipo === 'GRUPAL'` o `tipo === 'INSTITUCIONAL'`: incluir `cursoNombre` + `cantidadDestinatariosEstudiantes` (contar solo destinatarios de tipo ESTUDIANTE, excluir acudientes del conteo)
+- Nota: los mensajes masivos se almacenan en BD como `GRUPAL` — el tipo `MASIVO` no existe en el enum del backend
 - Ordenar por `createdAt` descendente
 
 **Respuesta esperada:**
