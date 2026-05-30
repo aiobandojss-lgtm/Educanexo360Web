@@ -19,17 +19,25 @@ Adicionalmente, cuando un docente envía un mensaje a un estudiante, el sistema 
 
 > **Este bloque es el contrato que el backend debe implementar antes de comenzar el frontend.**
 
-### 1.1 Nuevo campo en el modelo de Mensaje
+### 1.1 Nuevos campos en el modelo de Mensaje
 
-Agregar el campo `esCopiaAcudiente` al modelo `IMensaje` / `mensaje.model.ts`:
+Agregar los siguientes campos al modelo `IMensaje` / `mensaje.model.ts`:
 
 ```
-esCopiaAcudiente: Boolean  (default: false)
+esCopiaAcudiente: Boolean       (default: false)
+cursoIds:         [ObjectId]    (optional, ref: 'Curso')
 ```
 
-**Propósito:** Identificar los mensajes que el sistema generó automáticamente como copia al acudiente cuando un docente escribe a un estudiante. Este flag permite filtrarlos en la bandeja Enviados del docente y excluirlos del conteo de auditoría.
+**Campo `esCopiaAcudiente`:**  
+Identifica los mensajes que el sistema generó automáticamente como copia al acudiente cuando un docente escribe a un estudiante. Permite filtrarlos en la bandeja Enviados y excluirlos del conteo de auditoría.  
+Se establece en `true` en el servicio de mensajería, en el punto donde se crea la copia para el acudiente.
 
-**Cuándo se establece en `true`:** En el servicio de mensajería, en el punto donde se crea la copia para el acudiente — ese documento de mensaje debe guardarse con `esCopiaAcudiente: true`.
+**Campo `cursoIds`:**  
+Persiste los cursos destinatarios de un mensaje GRUPAL/masivo. Cuando el servicio `crearMensaje` recibe `cursoIds` en el payload (mensajes grupales), guarda esos IDs en el documento Mensaje además de resolver los estudiantes individuales en `destinatarios[]`.
+
+**Por qué es necesario:** sin este campo, los mensajes GRUPAL no tienen referencia al curso original una vez que se resuelven a IDs de estudiantes. Es la única forma confiable de obtener `cursoNombre` en el endpoint de auditoría.
+
+**Compatibilidad con datos históricos:** mensajes anteriores al despliegue tendrán `cursoIds: []`. El endpoint de auditoría devolverá `cursoNombre: null` para esos registros; el frontend mostrará un fallback como "Curso N/A".
 
 ---
 
@@ -259,8 +267,9 @@ Respetar la paleta verde/teal de la app:
 
 | Componente | Cambio | Quién |
 |-----------|--------|-------|
-| `mensaje.model.ts` | Agregar campo `esCopiaAcudiente: Boolean` | Backend |
+| `mensaje.model.ts` | Agregar campos `esCopiaAcudiente: Boolean` y `cursoIds: [ObjectId]` | Backend |
 | Servicio de mensajes | Marcar `esCopiaAcudiente: true` al crear copia para acudiente | Backend |
+| Servicio de mensajes | Persistir `cursoIds` al crear mensajes GRUPAL/masivo | Backend |
 | `GET /api/mensajes?bandeja=enviados` | Excluir `esCopiaAcudiente: true` | Backend |
 | `GET /api/mensajes/estadisticas-docentes` | Nuevo endpoint — agregación por docente | Backend |
 | `GET /api/mensajes/auditoria` | Nuevo endpoint — lista paginada por remitente | Backend |
