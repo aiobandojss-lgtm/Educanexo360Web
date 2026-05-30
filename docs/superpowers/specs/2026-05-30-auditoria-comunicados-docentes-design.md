@@ -105,7 +105,7 @@ GET /api/mensajes/estadisticas-docentes
   "meta": {
     "desde": "2026-05-01T00:00:00.000Z",
     "hasta": "2026-05-30T23:59:59.000Z",
-    "totalDocentes": 2
+    "totalDocentes": 3
   }
 }
 ```
