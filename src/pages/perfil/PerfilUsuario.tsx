@@ -1,5 +1,5 @@
 // src/pages/perfil/PerfilUsuario.tsx
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import {
@@ -30,7 +30,8 @@ import {
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { RootState } from '../../redux/store';
-import { useDetalleUsuarioPerfil } from '../../hooks/useAppQueries';
+import { useDetalleUsuarioPerfil, usePerfilesRol } from '../../hooks/useAppQueries';
+import { PerfilRol } from '../../types/user.types';
 
 // Interfaces para manejar diferentes tipos de datos
 interface EscuelaId {
@@ -59,6 +60,30 @@ const PerfilUsuario = () => {
   const userDetails: UserData | null = (queryData?.userData as UserData) ?? null;
   const escuela = queryData?.escuela ?? null;
   const error = queryError ? 'Error al cargar datos del perfil' : null;
+
+  // Resolución del nombre del perfil personalizado
+  const puedeVerPerfiles = ['ADMIN', 'RECTOR', 'COORDINADOR'].includes(user?.tipo || '');
+  const { data: perfiles = [] } = usePerfilesRol(puedeVerPerfiles);
+
+  const perfilNombre = useMemo(() => {
+    if (!user?.perfilRolId) return null;
+    const encontrado = (perfiles as PerfilRol[]).find(p => p._id === user.perfilRolId);
+    return encontrado?.nombre ?? null;
+  }, [user?.perfilRolId, perfiles]);
+
+  const getRolLabel = (tipo: string) => {
+    switch (tipo) {
+      case 'ADMIN': return 'Administrador';
+      case 'DOCENTE': return 'Docente';
+      case 'ESTUDIANTE': return 'Estudiante';
+      case 'ACUDIENTE': return 'Acudiente';
+      case 'PADRE': return 'Acudiente';
+      case 'COORDINADOR': return 'Coordinador';
+      case 'RECTOR': return 'Rector';
+      case 'ADMINISTRATIVO': return 'Administrativo';
+      default: return tipo;
+    }
+  };
   
   const navigateToEdit = () => {
     navigate('/perfil/editar');
@@ -141,12 +166,20 @@ const PerfilUsuario = () => {
                   <Typography variant="h3" color="primary.main">
                     {userDetails.nombre} {userDetails.apellidos}
                   </Typography>
-                  <Chip 
-                    label={userDetails.tipo} 
-                    color="secondary"
-                    size="small"
-                    sx={{ borderRadius: 8, mt: 1 }}
-                  />
+                  {perfilNombre ? (
+                    <Chip
+                      label={perfilNombre}
+                      size="small"
+                      sx={{ bgcolor: '#d1fae5', color: '#065f46', fontWeight: 600, borderRadius: 8, mt: 1 }}
+                    />
+                  ) : (
+                    <Chip
+                      label={getRolLabel(userDetails.tipo)}
+                      color="secondary"
+                      size="small"
+                      sx={{ borderRadius: 8, mt: 1 }}
+                    />
+                  )}
                 </Box>
               </Box>
               <Button 
@@ -198,13 +231,13 @@ const PerfilUsuario = () => {
                       Rol
                     </Typography>
                     <Typography variant="body1">
-                      {userDetails.tipo === 'ADMIN' ? 'Administrador' : 
-                       userDetails.tipo === 'DOCENTE' ? 'Docente' :
-                       userDetails.tipo === 'ESTUDIANTE' ? 'Estudiante' :
-                       userDetails.tipo === 'ACUDIENTE' ? 'Acudiente' : 
-                       userDetails.tipo === 'PADRE' ? 'Acudiente' : // Por compatibilidad con datos existentes
-                       userDetails.tipo}
+                      {perfilNombre ?? getRolLabel(userDetails.tipo)}
                     </Typography>
+                    {perfilNombre && (
+                      <Typography variant="caption" color="text.secondary">
+                        Base: {getRolLabel(userDetails.tipo)}
+                      </Typography>
+                    )}
                   </Box>
                 </Box>
               </Grid>

@@ -1,7 +1,8 @@
 // src/components/layout/MainLayout.tsx
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Box,
   Drawer,
@@ -16,7 +17,6 @@ import {
   useMediaQuery,
   useTheme,
   Divider,
-  Badge,
   Container,
 } from "@mui/material";
 import {
@@ -24,13 +24,14 @@ import {
   Person as PersonIcon,
   Logout as LogoutIcon,
   Settings as SettingsIcon,
-  Notifications as NotificationsIcon,
   ArrowBack as ArrowBackIcon,
 } from "@mui/icons-material";
 import NavigationMenu from "./NavigationMenu";
 import { logout } from "../../redux/slices/authSlice";
 import { logout as authLogout } from "../../services/authService";
 import { RootState } from "../../redux/store";
+import { usePerfilesRol } from "../../hooks/useAppQueries";
+import { PerfilRol } from "../../types/user.types";
 
 // Función para obtener la etiqueta correcta del rol de usuario
 const getRoleLabel = (role?: string): string => {
@@ -67,15 +68,28 @@ const MainLayout: React.FC = () => {
   const isSmallScreen = useMediaQuery(theme.breakpoints.down("md"));
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const qc = useQueryClient();
   const { user } = useSelector((state: RootState) => state.auth);
+
+  // Solo los roles que pueden consultar /api/perfiles-rol
+  const puedeVerPerfiles = ['ADMIN', 'RECTOR', 'COORDINADOR'].includes(user?.tipo || '');
+  const { data: perfiles = [] } = usePerfilesRol(puedeVerPerfiles);
+
+  // Nombre del perfil personalizado del usuario logueado (si tiene uno)
+  const perfilNombre = useMemo(() => {
+    if (!user?.perfilRolId) return null;
+    if (puedeVerPerfiles) {
+      const encontrado = (perfiles as PerfilRol[]).find(p => p._id === user.perfilRolId);
+      return encontrado?.nombre ?? null;
+    }
+    // Para roles que no pueden consultar la lista, indicamos que tiene perfil personalizado
+    return 'Perfil personalizado';
+  }, [user?.perfilRolId, perfiles, puedeVerPerfiles]);
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [notificationsAnchorEl, setNotificationsAnchorEl] =
-    useState<null | HTMLElement>(null);
 
   const openUserMenu = Boolean(anchorEl);
-  const openNotificationsMenu = Boolean(notificationsAnchorEl);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -95,17 +109,10 @@ const MainLayout: React.FC = () => {
     setAnchorEl(null);
   };
 
-  const handleNotificationsClick = (event: React.MouseEvent<HTMLElement>) => {
-    setNotificationsAnchorEl(event.currentTarget);
-  };
-
-  const handleNotificationsClose = () => {
-    setNotificationsAnchorEl(null);
-  };
-
   const handleLogout = () => {
     handleUserMenuClose();
     authLogout(); // Limpia localStorage (tokens, userProfile)
+    qc.clear();   // Limpia caché de react-query para evitar filtración entre sesiones
     dispatch(logout()); // Limpia Redux state
     navigate("/login");
   };
@@ -150,6 +157,24 @@ const MainLayout: React.FC = () => {
         />
         <Typography variant="subtitle2" sx={{ mt: 1 }}>
           {getRoleLabel(user?.tipo)}
+          {perfilNombre && (
+            <Box
+              component="span"
+              sx={{
+                display: 'block',
+                fontSize: '0.7rem',
+                fontWeight: 600,
+                bgcolor: 'rgba(255,255,255,0.2)',
+                borderRadius: '10px',
+                px: 1,
+                py: 0.25,
+                mt: 0.5,
+                letterSpacing: 0.3,
+              }}
+            >
+              {perfilNombre}
+            </Box>
+          )}
         </Typography>
       </Box>
       <Box sx={{ mt: 1 }} onClick={handleCloseDrawer}>
@@ -193,16 +218,6 @@ const MainLayout: React.FC = () => {
           <Box sx={{ flexGrow: 1 }} />
 
           <Box sx={{ display: "flex", alignItems: "center" }}>
-            <IconButton
-              color="inherit"
-              onClick={handleNotificationsClick}
-              sx={{ mr: 2 }}
-            >
-              <Badge badgeContent={2} color="primary">
-                <NotificationsIcon />
-              </Badge>
-            </IconButton>
-
             <IconButton
               onClick={handleUserMenuClick}
               sx={{
@@ -328,83 +343,6 @@ const MainLayout: React.FC = () => {
         </MenuItem>
       </Menu>
 
-      {/* Menú de Notificaciones */}
-      <Menu
-        anchorEl={notificationsAnchorEl}
-        open={openNotificationsMenu}
-        onClose={handleNotificationsClose}
-        transformOrigin={{ horizontal: "right", vertical: "top" }}
-        anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
-        PaperProps={{
-          elevation: 2,
-          sx: {
-            mt: 1.5,
-            borderRadius: 2,
-            minWidth: 300,
-            maxHeight: 400,
-          },
-        }}
-      >
-        <Box sx={{ px: 2, py: 1 }}>
-          <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
-            Notificaciones
-          </Typography>
-        </Box>
-
-        <Divider />
-
-        <Box sx={{ maxHeight: 300, overflow: "auto" }}>
-          <MenuItem
-            onClick={() => {
-              handleNotificationsClose();
-              navigate("/mensajes");
-            }}
-          >
-            <Box sx={{ py: 1 }}>
-              <Typography variant="body2" sx={{ fontWeight: "bold" }}>
-                Nuevo mensaje recibido
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                Hace 5 minutos
-              </Typography>
-            </Box>
-          </MenuItem>
-
-          <MenuItem
-            onClick={() => {
-              handleNotificationsClose();
-              navigate("/calificaciones");
-            }}
-          >
-            <Box sx={{ py: 1 }}>
-              <Typography variant="body2" sx={{ fontWeight: "bold" }}>
-                Nueva calificación registrada
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                Hace 2 horas
-              </Typography>
-            </Box>
-          </MenuItem>
-        </Box>
-
-        <Divider />
-
-        <MenuItem
-          onClick={() => {
-            handleNotificationsClose();
-            navigate("/notificaciones");
-          }}
-        >
-          <Typography
-            variant="body2"
-            align="center"
-            color="primary"
-            sx={{ width: "100%" }}
-          >
-            Ver todas las notificaciones
-          </Typography>
-        </MenuItem>
-      </Menu>
     </Box>
   );
 };

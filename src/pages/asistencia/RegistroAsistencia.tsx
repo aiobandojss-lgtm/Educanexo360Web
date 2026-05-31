@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useSelector } from "react-redux";
+import { RootState } from "../../redux/store";
 import {
   Box,
   Typography,
@@ -173,6 +175,7 @@ const RegistroAsistencia: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const modoEdicion = Boolean(id);
+  const { user } = useSelector((state: RootState) => state.auth);
 
   const [cursos, setCursos] = useState<any[]>([]);
   const [asignaturas, setAsignaturas] = useState<any[]>([]);
@@ -372,16 +375,26 @@ const RegistroAsistencia: React.FC = () => {
     const cargarAsignaturas = async () => {
       try {
         setLoading(true);
-        // Asegurarse de que estamos pasando un string del ID
         const cursoId =
           typeof formik.values.cursoId === "object"
             ? (formik.values.cursoId as any)?._id || ""
             : formik.values.cursoId;
 
-        const data = await asistenciaService.obtenerAsignaturasPorCurso(
-          cursoId
-        );
-        setAsignaturas(data);
+        const data = await asistenciaService.obtenerAsignaturasPorCurso(cursoId);
+
+        // Para DOCENTE: mostrar solo las asignaturas que tiene asignadas en ese curso.
+        // ADMIN, RECTOR y COORDINADOR ven todas.
+        const esDocente = user?.tipo === "DOCENTE";
+        const asignadas = user?.info_academica?.asignaturas_asignadas ?? [];
+
+        if (esDocente && asignadas.length > 0) {
+          const idsPermitidos = asignadas
+            .filter((a) => a.cursoId === cursoId)
+            .map((a) => a.asignaturaId);
+          setAsignaturas(data.filter((a: any) => idsPermitidos.includes(a._id)));
+        } else {
+          setAsignaturas(data);
+        }
       } catch (err) {
         console.error("Error al cargar asignaturas:", err);
         setError("No se pudieron cargar las asignaturas del curso");

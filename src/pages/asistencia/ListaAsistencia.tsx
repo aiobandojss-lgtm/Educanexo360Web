@@ -41,6 +41,13 @@ import {
   Add as AddIcon,
 } from "@mui/icons-material";
 import { format } from "date-fns";
+
+// Parsea la fecha ISO como fecha local evitando la conversión UTC→local del navegador.
+// "2026-05-01T00:00:00.000Z" en UTC-5 se mostraría como 30/04 sin este helper.
+const parseFechaLocal = (fechaStr: string): Date => {
+  const [year, month, day] = fechaStr.substring(0, 10).split("-").map(Number);
+  return new Date(year, month - 1, day);
+};
 import { RootState } from "../../redux/store";
 import { useNotificacion } from "../../components/common/Notificaciones";
 
@@ -61,11 +68,16 @@ interface AsistenciaResumen {
     grado: string;
     grupo: string;
   };
+  asignatura?: {
+    _id: string;
+    nombre: string;
+  };
   totalEstudiantes: number;
   presentes: number;
   ausentes: number;
   tardes: number;
   justificados: number;
+  permisos: number;
   porcentajeAsistencia: number;
   registradoPor: {
     _id: string;
@@ -73,7 +85,7 @@ interface AsistenciaResumen {
     apellidos: string;
   };
   createdAt: string;
-  finalizado: boolean; // Añadido el campo finalizado
+  finalizado: boolean;
 }
 
 const ListaAsistencia = () => {
@@ -201,26 +213,23 @@ const ListaAsistencia = () => {
   };
 
   // Estadísticas
-  const calcularEstadisticas = () => {
-    if (asistencias.length === 0) return null;
+  const calcularEstadisticas = (lista: AsistenciaResumen[]) => {
+    if (lista.length === 0) return null;
 
-    const totalRegistros = asistencias.length;
-    const totalEstudiantes = asistencias.reduce(
-      (sum, a) => sum + a.totalEstudiantes,
-      0
-    );
-    const totalPresentes = asistencias.reduce((sum, a) => sum + a.presentes, 0);
-    const totalAusentes = asistencias.reduce((sum, a) => sum + a.ausentes, 0);
-    const totalTardes = asistencias.reduce((sum, a) => sum + a.tardes, 0);
-    const totalJustificados = asistencias.reduce(
-      (sum, a) => sum + a.justificados,
-      0
-    );
+    const totalRegistros = lista.length;
+    const totalEstudiantes = lista.reduce((sum, a) => sum + a.totalEstudiantes, 0);
+    const totalPresentes = lista.reduce((sum, a) => sum + a.presentes, 0);
+    const totalAusentes = lista.reduce((sum, a) => sum + a.ausentes, 0);
+    const totalTardes = lista.reduce((sum, a) => sum + a.tardes, 0);
+    const totalJustificados = lista.reduce((sum, a) => sum + a.justificados, 0);
+    const totalPermisos = lista.reduce((sum, a) => sum + (a.permisos ?? 0), 0);
 
     const promedioAsistencia =
       totalEstudiantes > 0
         ? Math.round(
-            ((totalPresentes + totalJustificados) / totalEstudiantes) * 100
+            ((totalPresentes + totalTardes + totalJustificados + totalPermisos) /
+              totalEstudiantes) *
+              100
           )
         : 0;
 
@@ -231,11 +240,20 @@ const ListaAsistencia = () => {
       totalAusentes,
       totalTardes,
       totalJustificados,
+      totalPermisos,
       promedioAsistencia,
     };
   };
 
-  const estadisticas = calcularEstadisticas();
+  // Filtro cliente como respaldo: elimina registros fuera del rango seleccionado
+  const asistenciasFiltradas = React.useMemo(() => {
+    return asistencias.filter((a) => {
+      const fecha = a.fecha.substring(0, 10);
+      return fecha >= fechaInicio && fecha <= fechaFin;
+    });
+  }, [asistencias, fechaInicio, fechaFin]);
+
+  const estadisticas = calcularEstadisticas(asistenciasFiltradas);
   const puedeEditar = ["ADMIN", "DOCENTE"].includes(user?.tipo || "");
 
   return (
@@ -385,18 +403,11 @@ const ListaAsistencia = () => {
       {/* Estadísticas */}
       {estadisticas && (
         <Grid container spacing={2} sx={{ mb: 3 }}>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card
-              elevation={0}
-              sx={{
-                boxShadow: "0px 4px 4px rgba(0, 0, 0, 0.05)",
-                height: "100%",
-              }}
-            >
-              <CardContent sx={{ textAlign: "center" }}>
-                <Typography variant="h3" gutterBottom>
-                  Total Registros
-                </Typography>
+          {/* Total Registros */}
+          <Grid item xs={6} sm={4} md={2}>
+            <Card elevation={0} sx={{ boxShadow: "0px 4px 4px rgba(0,0,0,0.05)", height: "100%" }}>
+              <CardContent sx={{ textAlign: "center", py: 2 }}>
+                <Typography variant="h3" gutterBottom noWrap>Registros</Typography>
                 <Typography variant="h1" color="primary.main">
                   {estadisticas.totalRegistros}
                 </Typography>
@@ -404,87 +415,86 @@ const ListaAsistencia = () => {
             </Card>
           </Grid>
 
-          <Grid item xs={12} sm={6} md={3}>
-            <Card
-              elevation={0}
-              sx={{
-                boxShadow: "0px 4px 4px rgba(0, 0, 0, 0.05)",
-                height: "100%",
-              }}
-            >
-              <CardContent sx={{ textAlign: "center" }}>
-                <Typography variant="h3" gutterBottom>
-                  Presentes
-                </Typography>
+          {/* Presentes */}
+          <Grid item xs={6} sm={4} md={2}>
+            <Card elevation={0} sx={{ boxShadow: "0px 4px 4px rgba(0,0,0,0.05)", height: "100%" }}>
+              <CardContent sx={{ textAlign: "center", py: 2 }}>
+                <Typography variant="h3" gutterBottom noWrap>Presentes</Typography>
                 <Typography variant="h1" color="success.main">
                   {estadisticas.totalPresentes}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   {estadisticas.totalEstudiantes > 0
-                    ? Math.round(
-                        (estadisticas.totalPresentes /
-                          estadisticas.totalEstudiantes) *
-                          100
-                      )
-                    : 0}
-                  % del total
+                    ? Math.round((estadisticas.totalPresentes / estadisticas.totalEstudiantes) * 100)
+                    : 0}% del total
                 </Typography>
               </CardContent>
             </Card>
           </Grid>
 
-          <Grid item xs={12} sm={6} md={3}>
-            <Card
-              elevation={0}
-              sx={{
-                boxShadow: "0px 4px 4px rgba(0, 0, 0, 0.05)",
-                height: "100%",
-              }}
-            >
-              <CardContent sx={{ textAlign: "center" }}>
-                <Typography variant="h3" gutterBottom>
-                  Ausentes
+          {/* Tardanzas */}
+          <Grid item xs={6} sm={4} md={2}>
+            <Card elevation={0} sx={{ boxShadow: "0px 4px 4px rgba(0,0,0,0.05)", height: "100%" }}>
+              <CardContent sx={{ textAlign: "center", py: 2 }}>
+                <Typography variant="h3" gutterBottom noWrap>Tardanzas</Typography>
+                <Typography variant="h1" color="warning.main">
+                  {estadisticas.totalTardes}
                 </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {estadisticas.totalEstudiantes > 0
+                    ? Math.round((estadisticas.totalTardes / estadisticas.totalEstudiantes) * 100)
+                    : 0}% del total
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Justificados */}
+          <Grid item xs={6} sm={4} md={2}>
+            <Card elevation={0} sx={{ boxShadow: "0px 4px 4px rgba(0,0,0,0.05)", height: "100%" }}>
+              <CardContent sx={{ textAlign: "center", py: 2 }}>
+                <Typography variant="h3" gutterBottom noWrap>Justificados</Typography>
+                <Typography variant="h1" color="info.main">
+                  {estadisticas.totalJustificados}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {estadisticas.totalEstudiantes > 0
+                    ? Math.round((estadisticas.totalJustificados / estadisticas.totalEstudiantes) * 100)
+                    : 0}% del total
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Permisos */}
+          <Grid item xs={6} sm={4} md={2}>
+            <Card elevation={0} sx={{ boxShadow: "0px 4px 4px rgba(0,0,0,0.05)", height: "100%" }}>
+              <CardContent sx={{ textAlign: "center", py: 2 }}>
+                <Typography variant="h3" gutterBottom noWrap>Permisos</Typography>
+                <Typography variant="h1" color="primary.main">
+                  {estadisticas.totalPermisos}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {estadisticas.totalEstudiantes > 0
+                    ? Math.round((estadisticas.totalPermisos / estadisticas.totalEstudiantes) * 100)
+                    : 0}% del total
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Ausentes */}
+          <Grid item xs={6} sm={4} md={2}>
+            <Card elevation={0} sx={{ boxShadow: "0px 4px 4px rgba(0,0,0,0.05)", height: "100%" }}>
+              <CardContent sx={{ textAlign: "center", py: 2 }}>
+                <Typography variant="h3" gutterBottom noWrap>Ausentes</Typography>
                 <Typography variant="h1" color="error.main">
                   {estadisticas.totalAusentes}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   {estadisticas.totalEstudiantes > 0
-                    ? Math.round(
-                        (estadisticas.totalAusentes /
-                          estadisticas.totalEstudiantes) *
-                          100
-                      )
-                    : 0}
-                  % del total
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} sm={6} md={3}>
-            <Card
-              elevation={0}
-              sx={{
-                boxShadow: "0px 4px 4px rgba(0, 0, 0, 0.05)",
-                height: "100%",
-              }}
-            >
-              <CardContent sx={{ textAlign: "center" }}>
-                <Typography variant="h3" gutterBottom>
-                  Promedio Asistencia
-                </Typography>
-                <Typography
-                  variant="h1"
-                  color={
-                    estadisticas.promedioAsistencia >= 90
-                      ? "success.main"
-                      : estadisticas.promedioAsistencia >= 75
-                      ? "warning.main"
-                      : "error.main"
-                  }
-                >
-                  {estadisticas.promedioAsistencia}%
+                    ? Math.round((estadisticas.totalAusentes / estadisticas.totalEstudiantes) * 100)
+                    : 0}% del total
                 </Typography>
               </CardContent>
             </Card>
@@ -521,6 +531,7 @@ const ListaAsistencia = () => {
               <TableRow>
                 <TableCell>Fecha</TableCell>
                 <TableCell>Curso</TableCell>
+                <TableCell>Asignatura</TableCell>
                 {!esRolPersonal && <TableCell align="center">Total Estudiantes</TableCell>}
                 {!esRolPersonal && <TableCell align="center">Presentes</TableCell>}
                 {!esRolPersonal && <TableCell align="center">Ausentes</TableCell>}
@@ -533,17 +544,13 @@ const ListaAsistencia = () => {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={esRolPersonal ? 6 : 9} align="center" sx={{ py: 3 }}>
-                    {" "}
-                    {/* Actualizado colSpan a 9 */}
+                  <TableCell colSpan={esRolPersonal ? 7 : 10} align="center" sx={{ py: 3 }}>
                     <CircularProgress size={30} />
                   </TableCell>
                 </TableRow>
-              ) : asistencias.length === 0 ? (
+              ) : asistenciasFiltradas.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={esRolPersonal ? 6 : 9} align="center" sx={{ py: 3 }}>
-                    {" "}
-                    {/* Actualizado colSpan a 9 */}
+                  <TableCell colSpan={esRolPersonal ? 7 : 10} align="center" sx={{ py: 3 }}>
                     <Typography variant="body1" color="text.secondary">
                       No se encontraron registros de asistencia para los filtros
                       seleccionados.
@@ -551,7 +558,7 @@ const ListaAsistencia = () => {
                   </TableCell>
                 </TableRow>
               ) : (
-                asistencias
+                asistenciasFiltradas
                   .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                   .map((asistencia) => (
                     <TableRow
@@ -564,12 +571,17 @@ const ListaAsistencia = () => {
                       } // Destacar registros no finalizados
                     >
                       <TableCell>
-                        {format(new Date(asistencia.fecha), "dd/MM/yyyy")}
+                        {format(parseFechaLocal(asistencia.fecha), "dd/MM/yyyy")}
                       </TableCell>
                       <TableCell>
                         <strong>
                           {asistencia.curso.grado} {asistencia.curso.grupo}
                         </strong>
+                      </TableCell>
+                      <TableCell>
+                        {asistencia.asignatura?.nombre
+                          ? asistencia.asignatura.nombre
+                          : <Typography variant="body2" color="text.secondary" fontStyle="italic">—</Typography>}
                       </TableCell>
                       {!esRolPersonal && (
                         <TableCell align="center">
@@ -727,7 +739,7 @@ const ListaAsistencia = () => {
         <TablePagination
           rowsPerPageOptions={[5, 10, 25]}
           component="div"
-          count={asistencias.length}
+          count={asistenciasFiltradas.length}
           rowsPerPage={rowsPerPage}
           page={page}
           onPageChange={handleChangePage}

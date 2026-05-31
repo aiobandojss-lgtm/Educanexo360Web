@@ -45,3 +45,9 @@ yarn-error.log*
 # OS
 .DS_Store
 Thumbs.db
+
+# Brainstorming companion / archivos temporales
+.superpowers/
+temp_*.py
+temp_*.js
+temp_*.ts

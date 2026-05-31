@@ -43,6 +43,19 @@ import {
   AssignmentLate as JustificadoIcon,
 } from "@mui/icons-material";
 import { format } from "date-fns";
+import { es } from "date-fns/locale/es";
+
+const parseFechaLocal = (fechaStr: string): Date => {
+  const [year, month, day] = fechaStr.substring(0, 10).split("-").map(Number);
+  return new Date(year, month - 1, day);
+};
+
+const formatHora = (hora: string): string => {
+  const [h, m] = hora.split(":").map(Number);
+  const ampm = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 || 12;
+  return `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
+};
 import { useSelector } from "react-redux";
 import { RootState } from "../../redux/store";
 import { useNotificacion } from "../../components/common/Notificaciones";
@@ -351,7 +364,8 @@ const DetalleAsistencia = () => {
                   Fecha de registro
                 </Typography>
                 <Typography variant="h3">
-                  {format(new Date(asistencia.fecha), "EEEE, d MMMM yyyy")}
+                  {format(parseFechaLocal(asistencia.fecha), "EEEE, d 'de' MMMM 'de' yyyy", { locale: es })
+                    .replace(/^\w/, (c) => c.toUpperCase())}
                 </Typography>
               </Box>
             </Box>
@@ -379,7 +393,7 @@ const DetalleAsistencia = () => {
                   Horario
                 </Typography>
                 <Typography variant="h3">
-                  {asistencia.horaInicio} - {asistencia.horaFin}
+                  {formatHora(asistencia.horaInicio)} - {formatHora(asistencia.horaFin)}
                 </Typography>
               </Box>
             </Box>
@@ -431,18 +445,11 @@ const DetalleAsistencia = () => {
       {/* Estadísticas */}
       {estadisticas && (
         <Grid container spacing={2} sx={{ mb: 3 }}>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card
-              elevation={0}
-              sx={{
-                boxShadow: "0px 4px 4px rgba(0, 0, 0, 0.05)",
-                height: "100%",
-              }}
-            >
-              <CardContent sx={{ textAlign: "center" }}>
-                <Typography variant="h3" gutterBottom>
-                  Total Estudiantes
-                </Typography>
+          {/* Total */}
+          <Grid item xs={6} sm={4} md={2}>
+            <Card elevation={0} sx={{ boxShadow: "0px 4px 4px rgba(0,0,0,0.05)", height: "100%" }}>
+              <CardContent sx={{ textAlign: "center", py: 2 }}>
+                <Typography variant="h3" gutterBottom noWrap>Total</Typography>
                 <Typography variant="h1" color="primary.main">
                   {estadisticas.totalEstudiantes}
                 </Typography>
@@ -450,101 +457,87 @@ const DetalleAsistencia = () => {
             </Card>
           </Grid>
 
-          <Grid item xs={12} sm={6} md={3}>
-            <Card
-              elevation={0}
-              sx={{
-                boxShadow: "0px 4px 4px rgba(0, 0, 0, 0.05)",
-                height: "100%",
-              }}
-            >
-              <CardContent sx={{ textAlign: "center" }}>
-                <Typography variant="h3" gutterBottom>
-                  Presentes
-                </Typography>
+          {/* Presentes */}
+          <Grid item xs={6} sm={4} md={2}>
+            <Card elevation={0} sx={{ boxShadow: "0px 4px 4px rgba(0,0,0,0.05)", height: "100%" }}>
+              <CardContent sx={{ textAlign: "center", py: 2 }}>
+                <Typography variant="h3" gutterBottom noWrap>Presentes</Typography>
                 <Typography variant="h1" color="success.main">
                   {estadisticas.presentes}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  {estadisticas.porcentajePresentes}% del total
+                  {estadisticas.totalEstudiantes > 0
+                    ? Math.round((estadisticas.presentes / estadisticas.totalEstudiantes) * 100)
+                    : 0}%
                 </Typography>
               </CardContent>
             </Card>
           </Grid>
 
-          <Grid item xs={12} sm={6} md={3}>
-            <Card
-              elevation={0}
-              sx={{
-                boxShadow: "0px 4px 4px rgba(0, 0, 0, 0.05)",
-                height: "100%",
-              }}
-            >
-              <CardContent sx={{ textAlign: "center" }}>
-                <Typography variant="h3" gutterBottom>
-                  Ausentes
+          {/* Tardanzas */}
+          <Grid item xs={6} sm={4} md={2}>
+            <Card elevation={0} sx={{ boxShadow: "0px 4px 4px rgba(0,0,0,0.05)", height: "100%" }}>
+              <CardContent sx={{ textAlign: "center", py: 2 }}>
+                <Typography variant="h3" gutterBottom noWrap>Tardanzas</Typography>
+                <Typography variant="h1" color="warning.main">
+                  {estadisticas.tardanzas}
                 </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {estadisticas.totalEstudiantes > 0
+                    ? Math.round((estadisticas.tardanzas / estadisticas.totalEstudiantes) * 100)
+                    : 0}%
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Justificados */}
+          <Grid item xs={6} sm={4} md={2}>
+            <Card elevation={0} sx={{ boxShadow: "0px 4px 4px rgba(0,0,0,0.05)", height: "100%" }}>
+              <CardContent sx={{ textAlign: "center", py: 2 }}>
+                <Typography variant="h3" gutterBottom noWrap>Justificados</Typography>
+                <Typography variant="h1" color="info.main">
+                  {estadisticas.justificados}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {estadisticas.totalEstudiantes > 0
+                    ? Math.round((estadisticas.justificados / estadisticas.totalEstudiantes) * 100)
+                    : 0}%
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Con Permiso */}
+          <Grid item xs={6} sm={4} md={2}>
+            <Card elevation={0} sx={{ boxShadow: "0px 4px 4px rgba(0,0,0,0.05)", height: "100%" }}>
+              <CardContent sx={{ textAlign: "center", py: 2 }}>
+                <Typography variant="h3" gutterBottom noWrap>Permisos</Typography>
+                <Typography variant="h1" color="primary.main">
+                  {estadisticas.permisos}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {estadisticas.totalEstudiantes > 0
+                    ? Math.round((estadisticas.permisos / estadisticas.totalEstudiantes) * 100)
+                    : 0}%
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Ausentes */}
+          <Grid item xs={6} sm={4} md={2}>
+            <Card elevation={0} sx={{ boxShadow: "0px 4px 4px rgba(0,0,0,0.05)", height: "100%" }}>
+              <CardContent sx={{ textAlign: "center", py: 2 }}>
+                <Typography variant="h3" gutterBottom noWrap>Ausentes</Typography>
                 <Typography variant="h1" color="error.main">
                   {estadisticas.ausentes}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   {estadisticas.totalEstudiantes > 0
-                    ? Math.round(
-                        (estadisticas.ausentes /
-                          estadisticas.totalEstudiantes) *
-                          100
-                      )
-                    : 0}
-                  % del total
+                    ? Math.round((estadisticas.ausentes / estadisticas.totalEstudiantes) * 100)
+                    : 0}%
                 </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} sm={6} md={3}>
-            <Card
-              elevation={0}
-              sx={{
-                boxShadow: "0px 4px 4px rgba(0, 0, 0, 0.05)",
-                height: "100%",
-              }}
-            >
-              <CardContent sx={{ textAlign: "center" }}>
-                <Typography variant="h3" gutterBottom>
-                  Asistencia
-                </Typography>
-                <Box sx={{ position: "relative", display: "inline-flex" }}>
-                  <CircularProgress
-                    variant="determinate"
-                    value={estadisticas.porcentajeAsistencia}
-                    size={70}
-                    thickness={7}
-                    sx={{
-                      color:
-                        estadisticas.porcentajeAsistencia >= 90
-                          ? "success.main"
-                          : estadisticas.porcentajeAsistencia >= 75
-                          ? "warning.main"
-                          : "error.main",
-                    }}
-                  />
-                  <Box
-                    sx={{
-                      top: 0,
-                      left: 0,
-                      bottom: 0,
-                      right: 0,
-                      position: "absolute",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Typography variant="h3" component="div">
-                      {estadisticas.porcentajeAsistencia}%
-                    </Typography>
-                  </Box>
-                </Box>
               </CardContent>
             </Card>
           </Grid>

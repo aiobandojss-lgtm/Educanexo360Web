@@ -10,6 +10,7 @@ export interface IUsuario {
   tipo: string;
   escuelaId: string;
   estado: string;
+  perfilRolId?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -33,10 +34,21 @@ class UsuarioService {
     estado?: string;
   }): Promise<IUsuario[]> {
     try {
-      const response = await axiosInstance.get(API_ROUTES.USUARIOS.BASE, { params });
+      // limite=500 para traer todos los usuarios de la escuela sin corte por paginación
+      const response = await axiosInstance.get(API_ROUTES.USUARIOS.BASE, { params: { limite: 500, ...params } });
       return response.data.data;
     } catch (error) {
       console.error('Error al obtener usuarios:', error);
+      throw error;
+    }
+  }
+
+  async obtenerEstudiantes(): Promise<IUsuario[]> {
+    try {
+      const response = await axiosInstance.get(API_ROUTES.USUARIOS.GET_ESTUDIANTES, { params: { limite: 500 } });
+      return response.data.data;
+    } catch (error) {
+      console.error('Error al obtener estudiantes:', error);
       throw error;
     }
   }

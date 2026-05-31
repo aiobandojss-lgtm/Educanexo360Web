@@ -13,6 +13,16 @@ interface User {
   tipo: string;
   escuelaId: string;
   estado: string;
+  permisos?: string[];
+  perfilRolId?: string | null;
+  info_academica?: {
+    grado?: string;
+    docente_principal?: string;
+    cursos?: string[];
+    estudiantes_asociados?: string[];
+    asignaturas?: string[];
+    asignaturas_asignadas?: { _id: string; asignaturaId: string; cursoId: string }[];
+  };
 }
 
 // Definir el tipo para el estado

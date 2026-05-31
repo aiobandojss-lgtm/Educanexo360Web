@@ -1,8 +1,9 @@
 // src/pages/usuarios/ListaUsuarios.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { useUsuarios, QUERY_KEYS } from '../../hooks/useAppQueries';
+import { useUsuarios, usePerfilesRol, QUERY_KEYS } from '../../hooks/useAppQueries';
+import { PerfilRol } from '../../types/user.types';
 import usuarioService from '../../services/usuarioService';
 import {
   Box,
@@ -39,6 +40,7 @@ interface Usuario {
   email: string;
   tipo: string;
   estado: string;
+  perfilRolId?: string | null;
 }
 
 const ListaUsuarios: React.FC = () => {
@@ -46,8 +48,16 @@ const ListaUsuarios: React.FC = () => {
   const queryClient = useQueryClient();
 
   const { data: usuarios = [], isLoading: loading, isError } = useUsuarios();
+  const { data: perfiles = [] } = usePerfilesRol();
   const [filteredUsuarios, setFilteredUsuarios] = useState<Usuario[]>([]);
   const [busqueda, setBusqueda] = useState<string>('');
+
+  // Mapa id → nombre de perfil para lookup O(1)
+  const perfilNombreMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    (perfiles as PerfilRol[]).forEach(p => { map[p._id] = p.nombre; });
+    return map;
+  }, [perfiles]);
 
   const error = isError ? 'Error al cargar la lista de usuarios. Intente nuevamente más tarde.' : null;
 
@@ -258,13 +268,26 @@ const ListaUsuarios: React.FC = () => {
                   </TableCell>
                   <TableCell>{usuario.email}</TableCell>
                   <TableCell>
-                    <Chip
-                      label={getTipoUsuario(usuario.tipo)}
-                      color="primary"
-                      variant="outlined"
-                      size="small"
-                      sx={{ fontWeight: 500, borderRadius: 10 }}
-                    />
+                    {usuario.perfilRolId && perfilNombreMap[usuario.perfilRolId] ? (
+                      <Chip
+                        label={perfilNombreMap[usuario.perfilRolId]}
+                        size="small"
+                        sx={{
+                          bgcolor: '#d1fae5',
+                          color: '#065f46',
+                          fontWeight: 600,
+                          borderRadius: 10,
+                        }}
+                      />
+                    ) : (
+                      <Chip
+                        label={getTipoUsuario(usuario.tipo)}
+                        color="primary"
+                        variant="outlined"
+                        size="small"
+                        sx={{ fontWeight: 500, borderRadius: 10 }}
+                      />
+                    )}
                   </TableCell>
                   <TableCell>
                     <Chip

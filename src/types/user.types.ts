@@ -44,6 +44,36 @@ export interface ContactInfo {
 }
 
 /**
+ * Roles base válidos para perfiles de rol personalizados
+ */
+export type RolBase = 'DOCENTE' | 'COORDINADOR' | 'RECTOR' | 'ADMINISTRATIVO' | 'ACUDIENTE' | 'ESTUDIANTE';
+
+/**
+ * Perfil de rol personalizado creado por el ADMIN de una escuela
+ */
+export interface PerfilRol {
+  _id: string;
+  nombre: string;
+  descripcion?: string;
+  rolBase: RolBase;
+  permisos: string[];
+  escuelaId: string;
+  activo: boolean;
+  creadoPor: { nombre: string; apellidos: string };
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Entrada del catálogo de permisos disponibles en el sistema
+ */
+export interface CatalogoPermiso {
+  permiso: string;
+  modulo: string;
+  accion: string;
+}
+
+/**
  * Interfaz para el usuario con todos los campos requeridos
  */
 export interface User {
@@ -59,6 +89,8 @@ export interface User {
   avatar?: string;
   fecha_nacimiento?: string;
   genero?: string;
+  permisos?: string[];
+  perfilRolId?: string | null;
 }
 
 /**
@@ -104,6 +136,8 @@ export interface UserResponse {
   avatar?: string;
   fecha_nacimiento?: string;
   genero?: string;
+  permisos?: string[];
+  perfilRolId?: string | null;
   createdAt: string;
   updatedAt: string;
 }

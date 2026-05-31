@@ -107,6 +107,8 @@ const DetalleCurso = () => {
   const loading = loadingCurso || loadingEstudiantes || loadingAsignaturas;
   const error = errorCurso ? "No se pudo cargar la información del curso" : null;
 
+  const isAdmin = ['ADMIN', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO'].includes(user?.tipo || '');
+
   const [tabValue, setTabValue] = useState<number>(0);
   const [deleteDialog, setDeleteDialog] = useState<boolean>(false);
   const [actionLoading, setActionLoading] = useState(false);
@@ -310,40 +312,42 @@ const DetalleCurso = () => {
           Volver a la lista
         </Button>
 
-        <Box sx={{ display: "flex", gap: 1 }}>
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<Edit />}
-            onClick={() => navigate(`/cursos/editar/${curso._id}`)}
-            sx={{
-              borderRadius: 20,
-              fontWeight: 500,
-              boxShadow: "none",
-              "&:hover": {
-                boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.1)",
-              },
-            }}
-          >
-            Editar
-          </Button>
+        {isAdmin && (
+          <Box sx={{ display: "flex", gap: 1 }}>
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<Edit />}
+              onClick={() => navigate(`/cursos/editar/${curso._id}`)}
+              sx={{
+                borderRadius: 20,
+                fontWeight: 500,
+                boxShadow: "none",
+                "&:hover": {
+                  boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.1)",
+                },
+              }}
+            >
+              Editar
+            </Button>
 
-          <Button
-            variant="outlined"
-            color="error"
-            startIcon={<Delete />}
-            onClick={() => setDeleteDialog(true)}
-            sx={{
-              borderRadius: 20,
-              borderColor: "error.main",
-              "&:hover": {
-                backgroundColor: "rgba(244, 67, 54, 0.04)",
-              },
-            }}
-          >
-            Eliminar
-          </Button>
-        </Box>
+            <Button
+              variant="outlined"
+              color="error"
+              startIcon={<Delete />}
+              onClick={() => setDeleteDialog(true)}
+              sx={{
+                borderRadius: 20,
+                borderColor: "error.main",
+                "&:hover": {
+                  backgroundColor: "rgba(244, 67, 54, 0.04)",
+                },
+              }}
+            >
+              Eliminar
+            </Button>
+          </Box>
+        )}
       </Box>
 
       {/* Alerta de error en acciones (eliminar, etc.) */}
@@ -576,24 +580,26 @@ const DetalleCurso = () => {
                   <Typography variant="h4" color="primary.main">
                     Estudiantes del Curso
                   </Typography>
-                  <Button
-                    variant="contained"
-                    color="secondary"
-                    startIcon={<Add />}
-                    onClick={() =>
-                      navigate(`/cursos/${curso._id}/estudiantes/agregar`)
-                    }
-                    sx={{
-                      borderRadius: 20,
-                      fontWeight: 500,
-                      boxShadow: "none",
-                      "&:hover": {
-                        boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.1)",
-                      },
-                    }}
-                  >
-                    Agregar Estudiante
-                  </Button>
+                  {isAdmin && (
+                    <Button
+                      variant="contained"
+                      color="secondary"
+                      startIcon={<Add />}
+                      onClick={() =>
+                        navigate(`/cursos/${curso._id}/estudiantes/agregar`)
+                      }
+                      sx={{
+                        borderRadius: 20,
+                        fontWeight: 500,
+                        boxShadow: "none",
+                        "&:hover": {
+                          boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.1)",
+                        },
+                      }}
+                    >
+                      Agregar Estudiante
+                    </Button>
+                  )}
                 </Box>
 
                 {loading && estudiantes.length === 0 ? (
@@ -627,24 +633,26 @@ const DetalleCurso = () => {
                           secondary={estudiante.email}
                           primaryTypographyProps={{ fontWeight: 500 }}
                         />
-                        <ListItemSecondaryAction>
-                          <IconButton
-                            edge="end"
-                            color="error"
-                            onClick={() =>
-                              setRemoveEstudianteDialog({
-                                open: true,
-                                estudiante,
-                              })
-                            }
-                            sx={{
-                              bgcolor: "rgba(244, 67, 54, 0.1)",
-                              "&:hover": { bgcolor: "rgba(244, 67, 54, 0.2)" },
-                            }}
-                          >
-                            <Remove />
-                          </IconButton>
-                        </ListItemSecondaryAction>
+                        {isAdmin && (
+                          <ListItemSecondaryAction>
+                            <IconButton
+                              edge="end"
+                              color="error"
+                              onClick={() =>
+                                setRemoveEstudianteDialog({
+                                  open: true,
+                                  estudiante,
+                                })
+                              }
+                              sx={{
+                                bgcolor: "rgba(244, 67, 54, 0.1)",
+                                "&:hover": { bgcolor: "rgba(244, 67, 54, 0.2)" },
+                              }}
+                            >
+                              <Remove />
+                            </IconButton>
+                          </ListItemSecondaryAction>
+                        )}
                       </ListItem>
                     ))}
                   </List>
@@ -675,24 +683,26 @@ const DetalleCurso = () => {
                   <Typography variant="h4" color="primary.main">
                     Asignaturas del Curso
                   </Typography>
-                  <Button
-                    variant="contained"
-                    color="secondary"
-                    startIcon={<Add />}
-                    onClick={() =>
-                      navigate(`/cursos/${curso._id}/asignaturas/agregar`)
-                    }
-                    sx={{
-                      borderRadius: 20,
-                      fontWeight: 500,
-                      boxShadow: "none",
-                      "&:hover": {
-                        boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.1)",
-                      },
-                    }}
-                  >
-                    Agregar Asignatura
-                  </Button>
+                  {isAdmin && (
+                    <Button
+                      variant="contained"
+                      color="secondary"
+                      startIcon={<Add />}
+                      onClick={() =>
+                        navigate(`/cursos/${curso._id}/asignaturas/agregar`)
+                      }
+                      sx={{
+                        borderRadius: 20,
+                        fontWeight: 500,
+                        boxShadow: "none",
+                        "&:hover": {
+                          boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.1)",
+                        },
+                      }}
+                    >
+                      Agregar Asignatura
+                    </Button>
+                  )}
                 </Box>
 
                 {loading && asignaturas.length === 0 ? (
@@ -736,25 +746,27 @@ const DetalleCurso = () => {
                               {getNombreDocente(asignatura)}
                             </TableCell>
                             <TableCell align="center">
-                              <IconButton
-                                edge="end"
-                                color="error"
-                                onClick={(e) => {
-                                  e.stopPropagation(); // Prevenir la navegación
-                                  setRemoveAsignaturaDialog({
-                                    open: true,
-                                    asignatura,
-                                  });
-                                }}
-                                sx={{
-                                  bgcolor: "rgba(244, 67, 54, 0.1)",
-                                  "&:hover": {
-                                    bgcolor: "rgba(244, 67, 54, 0.2)",
-                                  },
-                                }}
-                              >
-                                <Remove />
-                              </IconButton>
+                              {isAdmin && (
+                                <IconButton
+                                  edge="end"
+                                  color="error"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setRemoveAsignaturaDialog({
+                                      open: true,
+                                      asignatura,
+                                    });
+                                  }}
+                                  sx={{
+                                    bgcolor: "rgba(244, 67, 54, 0.1)",
+                                    "&:hover": {
+                                      bgcolor: "rgba(244, 67, 54, 0.2)",
+                                    },
+                                  }}
+                                >
+                                  <Remove />
+                                </IconButton>
+                              )}
                             </TableCell>
                           </TableRow>
                         ))}

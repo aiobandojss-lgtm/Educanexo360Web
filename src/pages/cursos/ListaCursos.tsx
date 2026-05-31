@@ -34,6 +34,8 @@ import {
 } from '@mui/icons-material';
 import axiosInstance from '../../api/axiosConfig';
 import cursoService from '../../services/cursoService';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../redux/store';
 
 // Función de utilidad para extraer el nombre del usuario de forma segura
 const extractUserName = (user: any): string => {
@@ -116,6 +118,8 @@ interface Curso {
 const ListaCursos: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { user } = useSelector((state: RootState) => state.auth);
+  const isAdmin = ['ADMIN', 'COORDINADOR', 'RECTOR', 'ADMINISTRATIVO'].includes(user?.tipo || '');
 
   // Caché inteligente: segunda visita es instantánea
   const { data: cursos = [], isLoading: loading, isError } = useCursos();
@@ -204,16 +208,18 @@ const ListaCursos: React.FC = () => {
             Administración de Cursos
           </Typography>
         </Grid>
-        <Grid item>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => navigate('/cursos/nuevo')}
-            sx={{ borderRadius: '20px' }}
-          >
-            Nuevo Curso
-          </Button>
-        </Grid>
+        {isAdmin && (
+          <Grid item>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => navigate('/cursos/nuevo')}
+              sx={{ borderRadius: '20px' }}
+            >
+              Nuevo Curso
+            </Button>
+          </Grid>
+        )}
       </Grid>
 
       <Paper
@@ -364,22 +370,24 @@ const ListaCursos: React.FC = () => {
                         <VisibilityIcon />
                       </IconButton>
                     </Tooltip>
-                    <Tooltip title="Editar información del curso" arrow placement="top">
-                      <IconButton
-                        color="secondary"
-                        onClick={() => handleEditarCurso(curso._id)}
-                        sx={{
-                          mr: 1,
-                          bgcolor: 'rgba(0, 63, 145, 0.1)',
-                          '&:hover': {
-                            bgcolor: 'rgba(0, 63, 145, 0.2)',
-                          },
-                        }}
-                      >
-                        <EditIcon />
-                      </IconButton>
-                    </Tooltip>
-                    {curso.estado === 'ACTIVO' && (
+                    {isAdmin && (
+                      <Tooltip title="Editar información del curso" arrow placement="top">
+                        <IconButton
+                          color="secondary"
+                          onClick={() => handleEditarCurso(curso._id)}
+                          sx={{
+                            mr: 1,
+                            bgcolor: 'rgba(0, 63, 145, 0.1)',
+                            '&:hover': {
+                              bgcolor: 'rgba(0, 63, 145, 0.2)',
+                            },
+                          }}
+                        >
+                          <EditIcon />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                    {isAdmin && curso.estado === 'ACTIVO' && (
                       <Tooltip title="Desactivar curso" arrow placement="top">
                         <IconButton
                           color="error"

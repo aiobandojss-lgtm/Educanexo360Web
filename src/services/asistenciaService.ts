@@ -341,16 +341,17 @@ const generarExcelAsistencia = async (asistencia: any) => {
 export const obtenerResumenAsistencia = async (
   fechaInicio?: string,
   fechaFin?: string,
-  cursoId?: string
+  cursoId?: string,
+  estudianteId?: string
 ) => {
   try {
-    let url = "/asistencia/resumen?";
+    const params = new URLSearchParams();
+    if (fechaInicio) params.append("fechaInicio", fechaInicio);
+    if (fechaFin) params.append("fechaFin", fechaFin);
+    if (cursoId) params.append("cursoId", cursoId);
+    if (estudianteId) params.append("estudianteId", estudianteId);
 
-    if (fechaInicio) url += `fechaInicio=${fechaInicio}&`;
-    if (fechaFin) url += `fechaFin=${fechaFin}&`;
-    if (cursoId) url += `cursoId=${cursoId}`;
-
-    const response = await axiosInstance.get(url);
+    const response = await axiosInstance.get(`/asistencia/resumen?${params.toString()}`);
     return response.data.data;
   } catch (error) {
     console.error("Error al obtener resumen de asistencia:", error);

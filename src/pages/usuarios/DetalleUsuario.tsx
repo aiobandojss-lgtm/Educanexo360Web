@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
+import { useQueryClient } from '@tanstack/react-query';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import {
@@ -19,16 +20,23 @@ import {
   Alert,
   FormHelperText,
   Divider,
+  Chip,
 } from '@mui/material';
 import {
   Save as SaveIcon,
   Cancel as CancelIcon,
   Key as KeyIcon,
   Refresh as RefreshIcon,
+  Shield as ShieldIcon,
+  PersonRemove as PersonRemoveIcon,
+  AssignmentInd as AssignmentIndIcon,
 } from '@mui/icons-material';
 import axiosInstance from '../../api/axiosConfig';
 import AsociarEstudiantes from '../../components/usuarios/AsociarEstudiantes';
 import { RootState } from '../../redux/store';
+import { usePerfilesRol, QUERY_KEYS } from '../../hooks/useAppQueries';
+import { asignarPerfilAUsuario, removerPerfilDeUsuario } from '../../services/perfilRolService';
+import { PerfilRol } from '../../types/user.types';
 
 interface Escuela {
   _id: string;
@@ -67,6 +75,17 @@ const DetalleUsuario: React.FC = () => {
   const [success, setSuccess] = useState<string | null>(null);
   const [estudiantesAsociados, setEstudiantesAsociados] = useState<string[]>([]);
   const [escuelasLoaded, setEscuelasLoaded] = useState<boolean>(false);
+
+  // Estado para asignación de perfil de rol (edición)
+  const [perfilRolIdSeleccionado, setPerfilRolIdSeleccionado] = useState<string>('');
+  const [perfilRolActualId, setPerfilRolActualId] = useState<string | null>(null);
+  const [asignandoPerfil, setAsignandoPerfil] = useState(false);
+  const [errorPerfil, setErrorPerfil] = useState<string | null>(null);
+  const [successPerfil, setSuccessPerfil] = useState<string | null>(null);
+  // Estado para perfil de rol en creación de usuario
+  const [perfilRolIdCreacion, setPerfilRolIdCreacion] = useState<string>('');
+  const queryClient = useQueryClient();
+  const { data: todosLosPerfiles = [] } = usePerfilesRol();
 
   // Schema de validación
   const validationSchema = Yup.object({
@@ -117,15 +136,37 @@ const DetalleUsuario: React.FC = () => {
         if (isNewUser) {
           // Crear nuevo usuario
           const createResponse = await axiosInstance.post('/auth/register', dataToSend);
-          console.log('Respuesta de creación:', createResponse);
+          // /auth/register devuelve { success, data: { user: {...}, tokens: {...} } }
+          const responseData = createResponse.data;
+          const nuevoUsuarioId =
+            responseData?.data?.user?._id ||   // estructura estándar del backend
+            responseData?.data?._id         ||   // por si el backend lo pone directo en data
+            responseData?.user?._id         ||   // variante sin wrapper
+            responseData?._id               ||   // variante plana
+            null;
+
+          // Si el ADMIN seleccionó un perfil durante la creación, asignarlo de inmediato
+          if (nuevoUsuarioId && perfilRolIdCreacion) {
+            try {
+              await asignarPerfilAUsuario(nuevoUsuarioId, perfilRolIdCreacion);
+            } catch (perfilErr: any) {
+              // El usuario fue creado — solo advertimos, no bloqueamos
+              console.warn('Perfil no asignado:', perfilErr?.response?.data?.message || perfilErr);
+            }
+          }
+
+          // Refetch inmediato — los datos estarán listos cuando navegue a la lista
+          queryClient.refetchQueries({ queryKey: QUERY_KEYS.USUARIOS() });
           setSuccess('Usuario creado exitosamente');
           setTimeout(() => navigate('/usuarios'), 2000);
         } else {
           // Actualizar usuario existente
-          const updateResponse = await axiosInstance.put(`/usuarios/${id}`, dataToSend);
-          console.log('Respuesta de actualización:', updateResponse);
+          await axiosInstance.put(`/usuarios/${id}`, dataToSend);
+          // Invalidar caché de lista y detalle
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.USUARIOS() });
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DETALLE_USUARIO(id!) });
           setSuccess('Usuario actualizado exitosamente');
-          
+
           // Recargar el usuario para mostrar los cambios
           cargarUsuario();
         }
@@ -195,6 +236,12 @@ const DetalleUsuario: React.FC = () => {
           if (userData.tipo === 'ACUDIENTE' && userData.info_academica?.estudiantes_asociados) {
             setEstudiantesAsociados(userData.info_academica.estudiantes_asociados);
           }
+
+          // Guardar perfil de rol actual si existe
+          if (userData.perfilRolId) {
+            setPerfilRolActualId(userData.perfilRolId);
+            setPerfilRolIdSeleccionado(userData.perfilRolId);
+          }
         } else {
           console.error('Formato de respuesta inesperado al cargar usuario:', response);
           setError('Error al cargar los datos del usuario');
@@ -241,6 +288,41 @@ const DetalleUsuario: React.FC = () => {
     navigate(`/usuarios/${id}/cambiar-password`);
   };
 
+  const handleAsignarPerfil = async () => {
+    if (!id || !perfilRolIdSeleccionado) return;
+    try {
+      setAsignandoPerfil(true);
+      setErrorPerfil(null);
+      setSuccessPerfil(null);
+      await asignarPerfilAUsuario(id, perfilRolIdSeleccionado);
+      setPerfilRolActualId(perfilRolIdSeleccionado);
+      setSuccessPerfil('Perfil asignado correctamente');
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DETALLE_USUARIO(id) });
+    } catch (err: any) {
+      setErrorPerfil(err.response?.data?.message || 'Error al asignar el perfil');
+    } finally {
+      setAsignandoPerfil(false);
+    }
+  };
+
+  const handleQuitarPerfil = async () => {
+    if (!id) return;
+    try {
+      setAsignandoPerfil(true);
+      setErrorPerfil(null);
+      setSuccessPerfil(null);
+      await removerPerfilDeUsuario(id);
+      setPerfilRolActualId(null);
+      setPerfilRolIdSeleccionado('');
+      setSuccessPerfil('Perfil removido. El usuario vuelve a su rol base.');
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DETALLE_USUARIO(id) });
+    } catch (err: any) {
+      setErrorPerfil(err.response?.data?.message || 'Error al quitar el perfil');
+    } finally {
+      setAsignandoPerfil(false);
+    }
+  };
+
   const handleEstudiantesChange = (estudiantes: string[]) => {
     setEstudiantesAsociados(estudiantes);
   };
@@ -263,6 +345,15 @@ const DetalleUsuario: React.FC = () => {
       default: return tipo;
     }
   };
+
+  // Perfiles filtrados por rolBase compatible con el usuario (sirve tanto para creación como para edición)
+  const perfilesFiltrados = (todosLosPerfiles as PerfilRol[]).filter(
+    (p: PerfilRol) => p.rolBase === formik.values.tipo && p.activo
+  );
+  const perfilActualObj = (todosLosPerfiles as PerfilRol[]).find((p: PerfilRol) => p._id === perfilRolActualId);
+  const mostrarSeccionPerfil = !isNewUser && user?.tipo === 'ADMIN' && !!formik.values.tipo && formik.values.tipo !== 'ADMIN';
+  // Select de perfil en creación: solo si hay perfiles disponibles para el tipo elegido
+  const mostrarSelectCreacion = isNewUser && user?.tipo === 'ADMIN' && !!formik.values.tipo && formik.values.tipo !== 'ADMIN' && perfilesFiltrados.length > 0;
 
   return (
     <Box>
@@ -376,7 +467,11 @@ const DetalleUsuario: React.FC = () => {
                       name="tipo"
                       value={formik.values.tipo}
                       label="Tipo de Usuario"
-                      onChange={formik.handleChange}
+                      onChange={e => {
+                        formik.handleChange(e);
+                        // Resetear perfil seleccionado cuando cambia el tipo
+                        if (isNewUser) setPerfilRolIdCreacion('');
+                      }}
                       onBlur={formik.handleBlur}
                     >
                       <MenuItem value="ADMIN">Administrador</MenuItem>
@@ -393,8 +488,33 @@ const DetalleUsuario: React.FC = () => {
                   </FormControl>
                 </Grid>
 
+                {/* Perfil de rol en creación — solo ADMIN, solo cuando hay perfiles para el tipo elegido */}
+                {mostrarSelectCreacion && (
+                  <Grid item xs={12} sm={6}>
+                    <FormControl fullWidth disabled={saveLoading}>
+                      <InputLabel id="perfil-creacion-label">Perfil personalizado (opcional)</InputLabel>
+                      <Select
+                        labelId="perfil-creacion-label"
+                        value={perfilRolIdCreacion}
+                        label="Perfil personalizado (opcional)"
+                        onChange={e => setPerfilRolIdCreacion(e.target.value)}
+                      >
+                        <MenuItem value=""><em>Sin perfil personalizado</em></MenuItem>
+                        {perfilesFiltrados.map((p: PerfilRol) => (
+                          <MenuItem key={p._id} value={p._id}>
+                            {p.nombre}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                      <FormHelperText>
+                        Perfiles disponibles para {getTipoLabel(formik.values.tipo)}
+                      </FormHelperText>
+                    </FormControl>
+                  </Grid>
+                )}
+
                 <Grid item xs={12} sm={6}>
-                  <FormControl 
+                  <FormControl
                     fullWidth
                     error={formik.touched.escuelaId && Boolean(formik.errors.escuelaId)}
                     // Siempre deshabilitar el campo escuela para todos los roles
@@ -504,11 +624,103 @@ const DetalleUsuario: React.FC = () => {
           
           {/* Sección de estudiantes asociados (solo visible para usuarios tipo ACUDIENTE y cuando no es nuevo) */}
           {!isNewUser && formik.values.tipo === 'ACUDIENTE' && (
-            <AsociarEstudiantes 
-              acudienteId={id} 
+            <AsociarEstudiantes
+              acudienteId={id}
               estudiantes={estudiantesAsociados}
               onEstudiantesChange={handleEstudiantesChange}
             />
+          )}
+
+          {/* Sección de perfil de rol personalizado — solo visible para el ADMIN y en edición */}
+          {mostrarSeccionPerfil && (
+              <Paper
+                elevation={0}
+                sx={{ p: 3, borderRadius: 3, boxShadow: '0px 4px 4px rgba(0,0,0,0.05)', mt: 3 }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                  <ShieldIcon sx={{ color: '#059669' }} />
+                  <Typography variant="h6" color="text.primary">
+                    Perfil de rol personalizado
+                  </Typography>
+                  {perfilActualObj && (
+                    <Chip
+                      label={perfilActualObj.nombre}
+                      size="small"
+                      sx={{ bgcolor: '#d1fae5', color: '#065f46', fontWeight: 600, ml: 1 }}
+                    />
+                  )}
+                </Box>
+
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Asigna un perfil personalizado para extender los permisos del rol base de este usuario.
+                  Solo se muestran perfiles compatibles con el tipo <strong>{formik.values.tipo}</strong>.
+                </Typography>
+
+                {errorPerfil && (
+                  <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
+                    {errorPerfil}
+                  </Alert>
+                )}
+                {successPerfil && (
+                  <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }}>
+                    {successPerfil}
+                  </Alert>
+                )}
+
+                {perfilesFiltrados.length === 0 ? (
+                  <Alert severity="info" sx={{ borderRadius: 2 }}>
+                    No hay perfiles de rol creados para el tipo <strong>{formik.values.tipo}</strong>.
+                    Puedes crearlos desde la sección <strong>Perfiles de Rol</strong>.
+                  </Alert>
+                ) : (
+                  <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 2, flexWrap: 'wrap' }}>
+                    <FormControl sx={{ minWidth: 280 }} disabled={asignandoPerfil}>
+                      <InputLabel id="perfil-rol-label">Perfil de rol</InputLabel>
+                      <Select
+                        labelId="perfil-rol-label"
+                        value={perfilRolIdSeleccionado}
+                        label="Perfil de rol"
+                        onChange={e => setPerfilRolIdSeleccionado(e.target.value)}
+                      >
+                        <MenuItem value="">
+                          <em>Sin perfil personalizado</em>
+                        </MenuItem>
+                        {perfilesFiltrados.map((p: PerfilRol) => (
+                          <MenuItem key={p._id} value={p._id}>
+                            {p.nombre}
+                            <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                              ({p.permisos.length} permisos)
+                            </Typography>
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+
+                    <Button
+                      variant="contained"
+                      startIcon={asignandoPerfil ? <CircularProgress size={18} color="inherit" /> : <AssignmentIndIcon />}
+                      onClick={handleAsignarPerfil}
+                      disabled={asignandoPerfil || !perfilRolIdSeleccionado || perfilRolIdSeleccionado === perfilRolActualId}
+                      sx={{ borderRadius: '20px', height: 40 }}
+                    >
+                      {asignandoPerfil ? 'Asignando...' : 'Asignar perfil'}
+                    </Button>
+
+                    {perfilRolActualId && (
+                      <Button
+                        variant="outlined"
+                        color="error"
+                        startIcon={asignandoPerfil ? <CircularProgress size={18} color="inherit" /> : <PersonRemoveIcon />}
+                        onClick={handleQuitarPerfil}
+                        disabled={asignandoPerfil}
+                        sx={{ borderRadius: '20px', height: 40 }}
+                      >
+                        Quitar perfil
+                      </Button>
+                    )}
+                  </Box>
+                )}
+              </Paper>
           )}
         </>
       )}

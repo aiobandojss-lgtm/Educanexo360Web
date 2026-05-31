@@ -2,7 +2,7 @@
 import React, { useEffect } from "react";
 import { BrowserRouter } from "react-router-dom";
 import { Provider, useDispatch } from "react-redux";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { store } from "./redux/store";
 
 // Cliente global de @tanstack/react-query v5 con caché inteligente
@@ -39,6 +39,7 @@ import "@fontsource/roboto/700.css";
 // Componente interno para manejar la lógica de autenticación
 const AuthInitializer = () => {
   const dispatch = useDispatch();
+  const qc = useQueryClient();
 
   useEffect(() => {
     const initAuth = async () => {
@@ -61,23 +62,23 @@ const AuthInitializer = () => {
             dispatch(loginSuccess(ensureUserHasState(serverValidatedUser)));
           } else {
             console.log("Token rechazado por el servidor, haciendo logout");
-            // Si el servidor rechaza el token, hacer logout
+            qc.clear();
             dispatch(logout());
           }
         } catch (error) {
           console.error("Error verificando token con el servidor:", error);
-          // En caso de error de conexión u otro problema, hacer logout por seguridad
+          qc.clear();
           dispatch(logout());
         }
       } else {
         console.log("No hay token o es inválido localmente");
-        // Asegurarse de que el estado refleje que no estamos autenticados
+        qc.clear();
         dispatch(logout());
       }
     };
 
     initAuth();
-  }, [dispatch]);
+  }, [dispatch, qc]);
 
   return null;
 };

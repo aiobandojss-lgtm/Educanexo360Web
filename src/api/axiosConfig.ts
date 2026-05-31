@@ -9,7 +9,7 @@ if (isDev) {
   console.log("==================== DIAGNÓSTICO AXIOS ====================");
   console.log(
     "BaseURL configurada:",
-    import.meta.env.VITE_API_URL || "http://localhost:3000"
+    import.meta.env.DEV ? "(proxy Vite → localhost:3000)" : (import.meta.env.VITE_API_URL || "(sin configurar)")
   );
   console.log("Ambiente:", import.meta.env.MODE);
   console.log("============================================================");
@@ -40,7 +40,7 @@ export const ensureApiPrefix = (url: string): string => {
 
 // Crear una instancia de axios con la configuración base
 const axiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:3000",
+  baseURL: import.meta.env.DEV ? "" : (import.meta.env.VITE_API_URL || ""),
   headers: {
     "Content-Type": "application/json",
   },
@@ -49,7 +49,7 @@ const axiosInstance = axios.create({
 
 // Crear una instancia específica para carga de archivos con timeout más largo
 export const axiosFileInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:3000",
+  baseURL: import.meta.env.DEV ? "" : (import.meta.env.VITE_API_URL || ""),
   timeout: 60000, // 60 segundos para subidas de archivos
 });
 
