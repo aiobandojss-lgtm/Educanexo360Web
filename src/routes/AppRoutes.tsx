@@ -39,6 +39,7 @@ const ListaMensajes = lazy(() => import("../pages/mensajes/ListaMensajes"));
 const NuevoMensaje = lazy(() => import("../pages/mensajes/NuevoMensaje"));
 const DetalleMensaje = lazy(() => import("../pages/mensajes/DetalleMensaje"));
 const EditarBorrador = lazy(() => import("../pages/mensajes/EditarBorrador"));
+const AuditoriaMensajes = lazy(() => import('../pages/mensajes/AuditoriaMensajes'));
 
 // Usuarios
 const ListaUsuarios = lazy(() => import("../pages/usuarios/ListaUsuarios"));
@@ -246,6 +247,15 @@ const AppRoutes = () => {
             />
 
             <Route path=":id" element={<DetalleMensaje />} />
+
+            <Route
+              path="auditoria"
+              element={
+                <ProtectedRoute allowedRoles={["ADMIN", "RECTOR", "COORDINADOR"]}>
+                  <AuditoriaMensajes />
+                </ProtectedRoute>
+              }
+            />
           </Route>
 
           {/* Administración de invitaciones */}
@@ -388,7 +398,7 @@ const AppRoutes = () => {
           <Route
             path="cursos/:id/estudiantes/agregar"
             element={
-              <ProtectedRoute allowedRoles={["ADMIN", "DOCENTE", "COORDINADOR", "RECTOR", "ADMINISTRATIVO"]}>
+              <ProtectedRoute allowedRoles={["ADMIN", "COORDINADOR", "RECTOR", "ADMINISTRATIVO"]}>
                 <AgregarEstudianteCurso />
               </ProtectedRoute>
             }
@@ -396,7 +406,7 @@ const AppRoutes = () => {
           <Route
             path="cursos/:id/asignaturas/agregar"
             element={
-              <ProtectedRoute allowedRoles={["ADMIN", "DOCENTE", "COORDINADOR", "RECTOR", "ADMINISTRATIVO"]}>
+              <ProtectedRoute allowedRoles={["ADMIN", "COORDINADOR", "RECTOR", "ADMINISTRATIVO"]}>
                 <AgregarAsignaturaCurso />
               </ProtectedRoute>
             }

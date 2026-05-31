@@ -17,6 +17,7 @@ const MensajesLayout: React.FC = () => {
   
   // Determinar si el usuario puede tener borradores
   const puedeTenerBorradores = user && ROLES_CON_BORRADORES.includes(user.tipo);
+  const puedeVerAuditoria = ['ADMIN', 'RECTOR', 'COORDINADOR'].includes(user?.tipo || '');
   
   // Determinar la pestaña activa basada en la URL
   const getActiveTab = () => {
@@ -41,6 +42,7 @@ const MensajesLayout: React.FC = () => {
     if (puedeTenerBorradores) return 4;
     return 3;
   }
+  if (location.pathname.includes('auditoria')) return puedeTenerBorradores ? 5 : 4;
   return 0;
 };
   
@@ -72,7 +74,8 @@ const MensajesLayout: React.FC = () => {
     enviados: 1,
     borradores: 2,
     archivados: 3,
-    eliminados: 4
+    eliminados: 4,
+    ...(puedeVerAuditoria && { auditoria: 5 }),
   };
 };
   
@@ -172,6 +175,7 @@ const MensajesLayout: React.FC = () => {
           {puedeTenerBorradores && <Tab label="Borradores" />}
           <Tab label="Archivados" />
           <Tab label="Eliminados" />
+          {puedeVerAuditoria && <Tab label="Auditoría" />}
         </Tabs>
       </Paper>
       

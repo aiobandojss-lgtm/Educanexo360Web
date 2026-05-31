@@ -195,6 +195,12 @@ const NavigationMenu: React.FC = () => {
             "ADMINISTRATIVO",
           ],
         },
+        {
+          title: 'Auditoría',
+          icon: <BarChart2 {...iconProps} />,
+          path: '/mensajes/auditoria',
+          allowedRoles: ['ADMIN', 'RECTOR', 'COORDINADOR'],
+        },
       ],
     },
     {
