@@ -1,6 +1,12 @@
 // src/services/mensajeService.ts
 
 import axiosInstance, { axiosFileInstance } from "../api/axiosConfig";
+import type {
+  EstadisticaDocente,
+  MensajeAuditoria,
+  EstadisticasDocentesParams,
+  MensajesAuditoriaParams,
+} from '../types/auditoria.types';
 
 // Función auxiliar para depuración
 const logRequest = (method: string, url: string, data?: any) => {
@@ -730,6 +736,42 @@ const obtenerMensajes = async (
   }
 };
 
+// Estadísticas de comunicados por docente (para auditoría — solo RECTOR/COORDINADOR/ADMIN)
+const obtenerEstadisticasDocentes = async (
+  params: EstadisticasDocentesParams
+): Promise<{ data: EstadisticaDocente[]; meta: { desde: string; hasta: string; totalDocentes: number } }> => {
+  try {
+    const query = new URLSearchParams({ desde: params.desde, hasta: params.hasta });
+    if (params.cursoId) query.append('cursoId', params.cursoId);
+    if (params.docenteId) query.append('docenteId', params.docenteId);
+    const response = await axiosInstance.get(`/mensajes/estadisticas-docentes?${query.toString()}`);
+    return response.data;
+  } catch (error) {
+    console.error('[Frontend] Error obteniendo estadísticas de docentes:', error);
+    throw error;
+  }
+};
+
+// Lista de mensajes enviados por un docente específico (detalle expandible)
+const obtenerMensajesAuditoria = async (
+  params: MensajesAuditoriaParams
+): Promise<{ data: MensajeAuditoria[]; meta: { total: number; pagina: number; limite: number; paginas: number } }> => {
+  try {
+    const query = new URLSearchParams({
+      remitenteId: params.remitenteId,
+      desde: params.desde,
+      hasta: params.hasta,
+      pagina: String(params.pagina ?? 1),
+      limite: String(params.limite ?? 20),
+    });
+    const response = await axiosInstance.get(`/mensajes/auditoria?${query.toString()}`);
+    return response.data;
+  } catch (error) {
+    console.error('[Frontend] Error obteniendo mensajes de auditoría:', error);
+    throw error;
+  }
+};
+
 // Exportar todas las funciones
 const mensajeService = {
   buscarDestinatarios,
@@ -756,6 +798,9 @@ const mensajeService = {
   marcarComoLeido,
   descargarAdjunto,
   verificarEstadoMensajeParaUsuario,
+  // Funciones para auditoría
+  obtenerEstadisticasDocentes,
+  obtenerMensajesAuditoria,
 };
 
 export default mensajeService;
