@@ -132,6 +132,7 @@ const AuditoriaMensajes: React.FC = () => {
         remitenteId: docId,
         desde: `${desde}T00:00:00.000Z`,
         hasta: `${hasta}T23:59:59.999Z`,
+        limite: 200,
       });
       setMensajesDetalle(prev => ({ ...prev, [docId]: result.data }));
     } catch {
