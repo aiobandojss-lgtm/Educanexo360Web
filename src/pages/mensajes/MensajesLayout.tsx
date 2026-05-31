@@ -42,7 +42,7 @@ const MensajesLayout: React.FC = () => {
     if (puedeTenerBorradores) return 4;
     return 3;
   }
-  if (location.pathname.includes('auditoria')) return puedeTenerBorradores ? 5 : 4;
+  if (location.pathname.includes('auditoria')) return 5;
   return 0;
 };
   

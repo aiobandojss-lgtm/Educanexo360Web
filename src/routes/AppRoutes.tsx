@@ -246,8 +246,6 @@ const AppRoutes = () => {
               }
             />
 
-            <Route path=":id" element={<DetalleMensaje />} />
-
             <Route
               path="auditoria"
               element={
@@ -256,6 +254,8 @@ const AppRoutes = () => {
                 </ProtectedRoute>
               }
             />
+
+            <Route path=":id" element={<DetalleMensaje />} />
           </Route>
 
           {/* Administración de invitaciones */}
