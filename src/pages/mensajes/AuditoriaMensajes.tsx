@@ -28,6 +28,7 @@ import {
   Assessment as AuditIcon,
 } from '@mui/icons-material';
 import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import mensajeService from '../../services/mensajeService';
 import usuarioService, { IUsuario } from '../../services/usuarioService';
 import cursoService, { CursoDto } from '../../services/cursoService';
@@ -71,6 +72,7 @@ const AuditoriaMensajes: React.FC = () => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [mensajesDetalle, setMensajesDetalle] = useState<Record<string, MensajeAuditoria[]>>({});
   const [loadingDetalle, setLoadingDetalle] = useState<Record<string, boolean>>({});
+  const [detalleError, setDetalleError] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const cargarFiltros = async () => {
@@ -97,6 +99,7 @@ const AuditoriaMensajes: React.FC = () => {
     setBuscado(true);
     setExpandedId(null);
     setMensajesDetalle({});
+    setDetalleError({});
     try {
       const result = await mensajeService.obtenerEstadisticasDocentes({
         desde: `${desde}T00:00:00.000Z`,
@@ -118,7 +121,8 @@ const AuditoriaMensajes: React.FC = () => {
       return;
     }
     setExpandedId(docId);
-    if (mensajesDetalle[docId]) return; // Ya cargado, no volver a pedir
+    // Cache hit: detail already loaded for this search — handleBuscar clears this cache on each new search
+    if (mensajesDetalle[docId]) return;
     setLoadingDetalle(prev => ({ ...prev, [docId]: true }));
     try {
       const result = await mensajeService.obtenerMensajesAuditoria({
@@ -128,7 +132,7 @@ const AuditoriaMensajes: React.FC = () => {
       });
       setMensajesDetalle(prev => ({ ...prev, [docId]: result.data }));
     } catch {
-      setMensajesDetalle(prev => ({ ...prev, [docId]: [] }));
+      setDetalleError(prev => ({ ...prev, [docId]: true }));
     } finally {
       setLoadingDetalle(prev => ({ ...prev, [docId]: false }));
     }
@@ -309,7 +313,7 @@ const AuditoriaMensajes: React.FC = () => {
                       </TableCell>
                       <TableCell align="center" sx={{ color: '#6b7280', fontSize: 13 }}>
                         {est.ultimoMensaje
-                          ? format(new Date(est.ultimoMensaje), 'dd MMM')
+                          ? format(new Date(est.ultimoMensaje), 'dd MMM', { locale: es })
                           : '—'}
                       </TableCell>
                       <TableCell align="center">
@@ -345,7 +349,12 @@ const AuditoriaMensajes: React.FC = () => {
                                 <CircularProgress size={20} sx={{ color: '#059669' }} />
                               </Box>
                             )}
-                            {!loadingDetalle[est.docenteId] &&
+                            {!loadingDetalle[est.docenteId] && detalleError[est.docenteId] && (
+                              <Alert severity="error" sx={{ m: 1 }}>
+                                Error al cargar los mensajes. Intente nuevamente.
+                              </Alert>
+                            )}
+                            {!loadingDetalle[est.docenteId] && !detalleError[est.docenteId] &&
                               mensajesDetalle[est.docenteId] && (
                                 mensajesDetalle[est.docenteId].length === 0 ? (
                                   <Typography variant="body2" color="text.secondary" py={1}>
@@ -365,7 +374,7 @@ const AuditoriaMensajes: React.FC = () => {
                                       {mensajesDetalle[est.docenteId].map(msg => (
                                         <TableRow key={msg._id}>
                                           <TableCell sx={{ fontSize: 12, color: '#374151' }}>
-                                            {format(new Date(msg.createdAt), 'dd MMM')}
+                                            {format(new Date(msg.createdAt), 'dd MMM', { locale: es })}
                                           </TableCell>
                                           <TableCell sx={{ fontSize: 12, fontWeight: 500 }}>
                                             {msg.asunto}
@@ -379,8 +388,8 @@ const AuditoriaMensajes: React.FC = () => {
                                             <Box
                                               component="span"
                                               sx={{
-                                                background: msg.tipo === 'INDIVIDUAL' ? '#f3e8ff' : '#dbeafe',
-                                                color: msg.tipo === 'INDIVIDUAL' ? '#7c3aed' : '#1d4ed8',
+                                                background: msg.tipo === 'INDIVIDUAL' ? '#fef3c7' : '#d1fae5',
+                                                color: msg.tipo === 'INDIVIDUAL' ? '#92400e' : '#059669',
                                                 borderRadius: '4px',
                                                 px: 0.75,
                                                 py: 0.25,
