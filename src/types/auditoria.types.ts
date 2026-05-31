@@ -21,6 +21,7 @@ export interface DestinatarioResumen {
 export interface MensajeAuditoriaIndividual {
   _id: string;
   asunto: string;
+  contenido: string;
   createdAt: string;
   tipo: 'INDIVIDUAL';
   destinatario: DestinatarioResumen;
@@ -31,6 +32,7 @@ export interface MensajeAuditoriaIndividual {
 export interface MensajeAuditoriaGrupal {
   _id: string;
   asunto: string;
+  contenido: string;
   createdAt: string;
   tipo: 'GRUPAL' | 'INSTITUCIONAL';
   cursoNombre: string | null;

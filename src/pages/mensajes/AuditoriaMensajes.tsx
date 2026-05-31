@@ -21,11 +21,19 @@ import {
   Alert,
   Collapse,
   IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Tooltip,
+  Divider,
 } from '@mui/material';
 import {
   KeyboardArrowDown as ExpandIcon,
   KeyboardArrowUp as CollapseIcon,
   Assessment as AuditIcon,
+  Visibility as ViewIcon,
+  Close as CloseIcon,
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -73,6 +81,9 @@ const AuditoriaMensajes: React.FC = () => {
   const [mensajesDetalle, setMensajesDetalle] = useState<Record<string, MensajeAuditoria[]>>({});
   const [loadingDetalle, setLoadingDetalle] = useState<Record<string, boolean>>({});
   const [detalleError, setDetalleError] = useState<Record<string, boolean>>({});
+
+  // Dialog de contenido completo
+  const [mensajeAbierto, setMensajeAbierto] = useState<MensajeAuditoria | null>(null);
 
   useEffect(() => {
     const cargarFiltros = async () => {
@@ -368,6 +379,7 @@ const AuditoriaMensajes: React.FC = () => {
                                         <TableCell sx={{ color: '#6b7280', fontSize: 12, fontWeight: 600 }}>Asunto</TableCell>
                                         <TableCell sx={{ color: '#6b7280', fontSize: 12, fontWeight: 600 }}>Destinatario</TableCell>
                                         <TableCell sx={{ color: '#6b7280', fontSize: 12, fontWeight: 600 }}>Tipo</TableCell>
+                                        <TableCell sx={{ color: '#6b7280', fontSize: 12, fontWeight: 600 }} align="center">Ver</TableCell>
                                       </TableRow>
                                     </TableHead>
                                     <TableBody>
@@ -400,6 +412,17 @@ const AuditoriaMensajes: React.FC = () => {
                                               {msg.tipo === 'INDIVIDUAL' ? 'Individual' : 'Masivo'}
                                             </Box>
                                           </TableCell>
+                                          <TableCell align="center">
+                                            <Tooltip title="Ver contenido del mensaje">
+                                              <IconButton
+                                                size="small"
+                                                onClick={() => setMensajeAbierto(msg)}
+                                                sx={{ color: '#0D9488' }}
+                                              >
+                                                <ViewIcon fontSize="small" />
+                                              </IconButton>
+                                            </Tooltip>
+                                          </TableCell>
                                         </TableRow>
                                       ))}
                                     </TableBody>
@@ -423,6 +446,64 @@ const AuditoriaMensajes: React.FC = () => {
           </Box>
         </TableContainer>
       )}
+      {/* Dialog — contenido completo del mensaje */}
+      <Dialog
+        open={Boolean(mensajeAbierto)}
+        onClose={() => setMensajeAbierto(null)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3 } }}
+      >
+        {mensajeAbierto && (
+          <>
+            <DialogTitle sx={{ pb: 1 }}>
+              <Box display="flex" justifyContent="space-between" alignItems="flex-start">
+                <Box>
+                  <Typography variant="h6" fontWeight={600}>
+                    {mensajeAbierto.asunto}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {format(new Date(mensajeAbierto.createdAt), "dd 'de' MMMM yyyy", { locale: es })}
+                    {' · '}
+                    {mensajeAbierto.tipo === 'INDIVIDUAL'
+                      ? `Para: ${mensajeAbierto.destinatario.nombre} ${mensajeAbierto.destinatario.apellidos}`
+                      : `Para: ${mensajeAbierto.cursoNombre ?? 'Curso'} (${mensajeAbierto.cantidadDestinatariosEstudiantes} estudiantes)`}
+                  </Typography>
+                </Box>
+                <IconButton size="small" onClick={() => setMensajeAbierto(null)} sx={{ mt: -0.5 }}>
+                  <CloseIcon />
+                </IconButton>
+              </Box>
+            </DialogTitle>
+            <Divider />
+            <DialogContent sx={{ pt: 2 }}>
+              <Box
+                sx={{
+                  '& p': { margin: '0 0 8px 0' },
+                  '& ul, & ol': { paddingLeft: 3, margin: '0 0 8px 0' },
+                  '& h1, & h2, & h3': { margin: '8px 0', fontWeight: 600 },
+                  '& a': { color: '#059669' },
+                  fontSize: 14,
+                  lineHeight: 1.7,
+                  color: '#374151',
+                }}
+                dangerouslySetInnerHTML={{ __html: mensajeAbierto.contenido }}
+              />
+            </DialogContent>
+            <Divider />
+            <DialogActions sx={{ px: 3, py: 1.5 }}>
+              <Button
+                onClick={() => setMensajeAbierto(null)}
+                variant="outlined"
+                size="small"
+                sx={{ borderColor: '#059669', color: '#059669' }}
+              >
+                Cerrar
+              </Button>
+            </DialogActions>
+          </>
+        )}
+      </Dialog>
     </Box>
   );
 };
