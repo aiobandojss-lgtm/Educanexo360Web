@@ -24,7 +24,7 @@ export interface MensajeAuditoriaIndividual {
   contenido: string;
   createdAt: string;
   tipo: 'INDIVIDUAL';
-  destinatario: DestinatarioResumen;
+  destinatario: DestinatarioResumen | null;
   cursoEstudiante: { _id: string; nombre: string } | null;
   cursoNombre?: never;
   cantidadDestinatariosEstudiantes?: never;

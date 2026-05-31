@@ -369,7 +369,9 @@ const AuditoriaMensajes: React.FC = () => {
                                             {msg.tipo === 'INDIVIDUAL'
                                               ? (
                                                 <span>
-                                                  {`👤 ${msg.destinatario.nombre} ${msg.destinatario.apellidos}`}
+                                                  {msg.destinatario
+                                                    ? `👤 ${msg.destinatario.nombre} ${msg.destinatario.apellidos}`
+                                                    : '👤 Destinatario'}
                                                   {msg.cursoEstudiante && (
                                                     <Box component="span" sx={{ ml: 0.75, color: '#6b7280', fontSize: 11 }}>
                                                       ({msg.cursoEstudiante.nombre})
@@ -449,7 +451,7 @@ const AuditoriaMensajes: React.FC = () => {
                     {format(new Date(mensajeAbierto.createdAt), "dd 'de' MMMM yyyy", { locale: es })}
                     {' · '}
                     {mensajeAbierto.tipo === 'INDIVIDUAL'
-                      ? `Para: ${mensajeAbierto.destinatario.nombre} ${mensajeAbierto.destinatario.apellidos}`
+                      ? `Para: ${mensajeAbierto.destinatario?.nombre ?? 'Destinatario'} ${mensajeAbierto.destinatario?.apellidos ?? ''}`
                       : `Para: ${mensajeAbierto.cursoNombre ?? 'Curso'} (${mensajeAbierto.cantidadDestinatariosEstudiantes} estudiantes)`}
                   </Typography>
                 </Box>
