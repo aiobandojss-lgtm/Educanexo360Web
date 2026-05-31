@@ -34,6 +34,8 @@ import {
   Assessment as AuditIcon,
   Visibility as ViewIcon,
   Close as CloseIcon,
+  NavigateBefore as PrevIcon,
+  NavigateNext as NextIcon,
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -78,6 +80,8 @@ const AuditoriaMensajes: React.FC = () => {
   const [mensajesDetalle, setMensajesDetalle] = useState<Record<string, MensajeAuditoria[]>>({});
   const [loadingDetalle, setLoadingDetalle] = useState<Record<string, boolean>>({});
   const [detalleError, setDetalleError] = useState<Record<string, boolean>>({});
+  const [detallesPagina, setDetallesPagina] = useState<Record<string, number>>({});
+  const [detallesMeta, setDetallesMeta] = useState<Record<string, { total: number; paginas: number }>>({});
 
   // Dialog de contenido completo
   const [mensajeAbierto, setMensajeAbierto] = useState<MensajeAuditoria | null>(null);
@@ -104,6 +108,8 @@ const AuditoriaMensajes: React.FC = () => {
     setExpandedId(null);
     setMensajesDetalle({});
     setDetalleError({});
+    setDetallesPagina({});
+    setDetallesMeta({});
     try {
       const result = await mensajeService.obtenerEstadisticasDocentes({
         desde: `${desde}T00:00:00.000Z`,
@@ -118,27 +124,36 @@ const AuditoriaMensajes: React.FC = () => {
     }
   };
 
-  const handleToggleDetalle = async (docId: string) => {
-    if (expandedId === docId) {
-      setExpandedId(null);
-      return;
-    }
-    setExpandedId(docId);
-    // Cache hit: detail already loaded for this search — handleBuscar clears this cache on each new search
-    if (mensajesDetalle[docId]) return;
+  const cargarPaginaDetalle = async (docId: string, pagina: number) => {
     setLoadingDetalle(prev => ({ ...prev, [docId]: true }));
+    setDetalleError(prev => ({ ...prev, [docId]: false }));
+    setDetallesPagina(prev => ({ ...prev, [docId]: pagina }));
     try {
       const result = await mensajeService.obtenerMensajesAuditoria({
         remitenteId: docId,
         desde: `${desde}T00:00:00.000Z`,
         hasta: `${hasta}T23:59:59.999Z`,
-        limite: 200,
+        pagina,
+        limite: 20,
       });
       setMensajesDetalle(prev => ({ ...prev, [docId]: result.data }));
+      setDetallesMeta(prev => ({ ...prev, [docId]: { total: result.meta.total, paginas: result.meta.paginas } }));
     } catch {
       setDetalleError(prev => ({ ...prev, [docId]: true }));
     } finally {
       setLoadingDetalle(prev => ({ ...prev, [docId]: false }));
+    }
+  };
+
+  const handleToggleDetalle = (docId: string) => {
+    if (expandedId === docId) {
+      setExpandedId(null);
+      return;
+    }
+    setExpandedId(docId);
+    // Solo carga si no hay datos para página 1 de esta búsqueda
+    if (!mensajesDetalle[docId]) {
+      cargarPaginaDetalle(docId, 1);
     }
   };
 
@@ -336,8 +351,12 @@ const AuditoriaMensajes: React.FC = () => {
                               </Box>
                             )}
                             {!loadingDetalle[est.docenteId] && detalleError[est.docenteId] && (
-                              <Alert severity="error" sx={{ m: 1 }}>
-                                Error al cargar los mensajes. Intente nuevamente.
+                              <Alert severity="error" sx={{ m: 1 }} action={
+                                <Button size="small" onClick={() => cargarPaginaDetalle(est.docenteId, detallesPagina[est.docenteId] ?? 1)}>
+                                  Reintentar
+                                </Button>
+                              }>
+                                Error al cargar los mensajes.
                               </Alert>
                             )}
                             {!loadingDetalle[est.docenteId] && !detalleError[est.docenteId] &&
@@ -415,6 +434,32 @@ const AuditoriaMensajes: React.FC = () => {
                                   </Table>
                                 )
                               )}
+                            {/* Paginación del detalle */}
+                            {!loadingDetalle[est.docenteId] && !detalleError[est.docenteId] &&
+                              detallesMeta[est.docenteId] && detallesMeta[est.docenteId].paginas > 1 && (
+                              <Box display="flex" alignItems="center" justifyContent="flex-end" gap={0.5} pt={1} px={0.5}>
+                                <Typography variant="caption" color="text.secondary" sx={{ mr: 1 }}>
+                                  Pág. {detallesPagina[est.docenteId] ?? 1} de {detallesMeta[est.docenteId].paginas}
+                                  {' · '}{detallesMeta[est.docenteId].total} mensajes
+                                </Typography>
+                                <IconButton
+                                  size="small"
+                                  disabled={(detallesPagina[est.docenteId] ?? 1) <= 1}
+                                  onClick={() => cargarPaginaDetalle(est.docenteId, (detallesPagina[est.docenteId] ?? 1) - 1)}
+                                  sx={{ color: '#059669' }}
+                                >
+                                  <PrevIcon fontSize="small" />
+                                </IconButton>
+                                <IconButton
+                                  size="small"
+                                  disabled={(detallesPagina[est.docenteId] ?? 1) >= detallesMeta[est.docenteId].paginas}
+                                  onClick={() => cargarPaginaDetalle(est.docenteId, (detallesPagina[est.docenteId] ?? 1) + 1)}
+                                  sx={{ color: '#059669' }}
+                                >
+                                  <NextIcon fontSize="small" />
+                                </IconButton>
+                              </Box>
+                            )}
                           </Box>
                         </Collapse>
                       </TableCell>
