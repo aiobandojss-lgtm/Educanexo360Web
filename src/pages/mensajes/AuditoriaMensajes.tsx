@@ -39,7 +39,6 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import mensajeService from '../../services/mensajeService';
 import usuarioService, { IUsuario } from '../../services/usuarioService';
-import cursoService, { CursoDto } from '../../services/cursoService';
 import type { EstadisticaDocente, MensajeAuditoria } from '../../types/auditoria.types';
 
 const getFirstDayOfMonth = (): string => {
@@ -63,11 +62,9 @@ const AuditoriaMensajes: React.FC = () => {
   const [desde, setDesde] = useState(getFirstDayOfMonth());
   const [hasta, setHasta] = useState(getLastDayOfMonth());
   const [docenteId, setDocenteId] = useState('');
-  const [cursoId, setCursoId] = useState('');
 
   // Dropdowns
   const [docentes, setDocentes] = useState<IUsuario[]>([]);
-  const [cursos, setCursos] = useState<CursoDto[]>([]);
   const [loadingFiltros, setLoadingFiltros] = useState(true);
 
   // Resultados
@@ -88,12 +85,8 @@ const AuditoriaMensajes: React.FC = () => {
   useEffect(() => {
     const cargarFiltros = async () => {
       try {
-        const [docentesData, cursosData] = await Promise.all([
-          usuarioService.obtenerUsuarios({ tipo: 'DOCENTE' }),
-          cursoService.obtenerCursos(),
-        ]);
+        const docentesData = await usuarioService.obtenerUsuarios({ tipo: 'DOCENTE' });
         setDocentes(docentesData);
-        setCursos(cursosData);
       } catch {
         // Los filtros son opcionales; si fallan, igual se puede buscar sin filtrar
       } finally {
@@ -116,7 +109,6 @@ const AuditoriaMensajes: React.FC = () => {
         desde: `${desde}T00:00:00.000Z`,
         hasta: `${hasta}T23:59:59.999Z`,
         ...(docenteId && { docenteId }),
-        ...(cursoId && { cursoId }),
       });
       setEstadisticas(result.data);
     } catch {
@@ -194,7 +186,7 @@ const AuditoriaMensajes: React.FC = () => {
               InputLabelProps={{ shrink: true }}
             />
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid item xs={12} sm={6} md={4}>
             <FormControl fullWidth size="small">
               <InputLabel>Docente</InputLabel>
               <Select
@@ -207,24 +199,6 @@ const AuditoriaMensajes: React.FC = () => {
                 {docentes.map(d => (
                   <MenuItem key={d._id} value={d._id}>
                     {d.nombre} {d.apellidos}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Curso</InputLabel>
-              <Select
-                value={cursoId}
-                onChange={e => setCursoId(e.target.value)}
-                label="Curso"
-                disabled={loadingFiltros}
-              >
-                <MenuItem value="">Todos los cursos</MenuItem>
-                {cursos.map(c => (
-                  <MenuItem key={c._id} value={c._id}>
-                    {c.nombre}
                   </MenuItem>
                 ))}
               </Select>
@@ -393,7 +367,16 @@ const AuditoriaMensajes: React.FC = () => {
                                           </TableCell>
                                           <TableCell sx={{ fontSize: 12, color: '#374151' }}>
                                             {msg.tipo === 'INDIVIDUAL'
-                                              ? `👤 ${msg.destinatario.nombre} ${msg.destinatario.apellidos}`
+                                              ? (
+                                                <span>
+                                                  {`👤 ${msg.destinatario.nombre} ${msg.destinatario.apellidos}`}
+                                                  {msg.cursoEstudiante && (
+                                                    <Box component="span" sx={{ ml: 0.75, color: '#6b7280', fontSize: 11 }}>
+                                                      ({msg.cursoEstudiante.nombre})
+                                                    </Box>
+                                                  )}
+                                                </span>
+                                              )
                                               : `📚 Masivo → ${msg.cursoNombre ?? 'Curso N/A'} (${msg.cantidadDestinatariosEstudiantes} est.)`}
                                           </TableCell>
                                           <TableCell>
