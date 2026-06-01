@@ -1,6 +1,7 @@
 export interface CursoResumen {
   _id: string;
   nombre: string;
+  grupo: string;
 }
 
 export interface EstadisticaDocente {

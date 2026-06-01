@@ -293,7 +293,7 @@ const AuditoriaMensajes: React.FC = () => {
                       </TableCell>
                       <TableCell sx={{ color: '#6b7280', fontSize: 13 }}>
                         {est.cursos.length > 0
-                          ? est.cursos.map(c => c.nombre).join(', ')
+                          ? est.cursos.map(c => `${c.nombre} ${c.grupo}`.trim()).join(', ')
                           : '—'}
                       </TableCell>
                       <TableCell align="center">
