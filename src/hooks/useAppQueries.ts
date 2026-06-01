@@ -53,7 +53,7 @@ export const QUERY_KEYS = {
   EVENTOS: ["eventos"],
   TAREAS: ["tareas"],
   INVITACIONES: (pagina: number, limite: number, estado: string) => ["invitaciones", pagina, limite, estado],
-  MENSAJES: (bandeja: string, userId: string) => ["mensajes", bandeja, userId],
+  MENSAJES: (bandeja: string, userId: string, pagina: number) => ["mensajes", bandeja, userId, pagina],
   ASISTENCIA_CURSOS: ["asistencia-cursos"],
   ASISTENCIA_RESUMEN: (inicio: string, fin: string, curso: string) => ["asistencia-resumen", inicio, fin, curso],
   DETALLE_TAREA: (id: string, rol: string) => ["tarea-detalle", id, rol],
@@ -339,14 +339,14 @@ export const useEventosMes = (
 // ─────────────────────────────────────────────
 
 /** Mensajes de una bandeja. Caché de 1 minuto (alta frecuencia de cambios). */
-export const useMensajes = (bandeja: string, userId: string, puedeTenerBorradores: boolean) => {
+export const useMensajes = (bandeja: string, userId: string, puedeTenerBorradores: boolean, pagina: number = 1) => {
   return useQuery({
-    queryKey: QUERY_KEYS.MENSAJES(bandeja, userId),
+    queryKey: QUERY_KEYS.MENSAJES(bandeja, userId, pagina),
     queryFn: () => {
       if (bandeja === "borradores" && puedeTenerBorradores) {
-        return mensajeService.obtenerBorradores();
+        return mensajeService.obtenerBorradores(pagina);
       }
-      return mensajeService.obtenerMensajes(bandeja, 1, 20, userId);
+      return mensajeService.obtenerMensajes(bandeja, pagina, 20, userId);
     },
     staleTime: 1000 * 60 * 1,
     enabled: !!userId,

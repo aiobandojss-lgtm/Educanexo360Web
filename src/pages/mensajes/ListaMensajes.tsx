@@ -1,5 +1,5 @@
 // src/pages/mensajes/ListaMensajes.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -24,6 +24,7 @@ import {
   DialogContentText,
   DialogTitle,
   Snackbar,
+  Pagination,
 } from '@mui/material';
 import {
   Person as PersonIcon,
@@ -96,6 +97,8 @@ const ListaMensajes: React.FC = () => {
   const queryClient = useQueryClient();
   const { user } = useSelector((state: RootState) => state.auth);
 
+  const [pagina, setPagina] = useState<number>(1);
+
   const [snackbar, setSnackbar] = useState<{open: boolean, message: string, severity: 'success' | 'error'}>({
     open: false,
     message: '',
@@ -119,16 +122,23 @@ const ListaMensajes: React.FC = () => {
   
   const bandeja = getBandeja();
 
+  // Resetear a página 1 al cambiar de bandeja
+  useEffect(() => {
+    setPagina(1);
+  }, [bandeja]);
+
   // Verificar si el usuario tiene acceso a borradores
   const puedeTenerBorradores = !!(user && ROLES_CON_BORRADORES.includes(user.tipo));
 
   const { data: queryData, isLoading: loading, error: queryError } = useMensajes(
     bandeja,
     user?._id || "",
-    puedeTenerBorradores
+    puedeTenerBorradores,
+    pagina
   );
 
   const mensajes: Mensaje[] = (queryData?.data as Mensaje[]) || [];
+  const totalPaginas: number = (queryData?.meta as { paginas?: number })?.paginas ?? 1;
   const error = queryError ? "No se pudieron cargar los mensajes. Intente nuevamente más tarde." : null;
 
   const invalidarMensajes = () => {
@@ -744,6 +754,20 @@ const archivarMensaje = async (id: string): Promise<void> => {
             <Typography variant="body1" color="text.secondary">
               No hay mensajes en esta bandeja
             </Typography>
+          </Box>
+        )}
+
+        {totalPaginas > 1 && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+            <Pagination
+              count={totalPaginas}
+              page={pagina}
+              onChange={(_e, value) => setPagina(value)}
+              color="primary"
+              shape="rounded"
+              showFirstButton
+              showLastButton
+            />
           </Box>
         )}
       </Paper>
