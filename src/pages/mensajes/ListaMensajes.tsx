@@ -138,7 +138,7 @@ const ListaMensajes: React.FC = () => {
   );
 
   const mensajes: Mensaje[] = (queryData?.data as Mensaje[]) || [];
-  const totalPaginas: number = (queryData?.meta as { paginas?: number })?.paginas ?? 1;
+  const totalPaginas: number = (queryData?.meta as { totalPaginas?: number })?.totalPaginas ?? 1;
   const error = queryError ? "No se pudieron cargar los mensajes. Intente nuevamente más tarde." : null;
 
   const invalidarMensajes = () => {
