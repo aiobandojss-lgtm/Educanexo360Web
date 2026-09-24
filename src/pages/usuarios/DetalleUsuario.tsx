@@ -354,6 +354,9 @@ const DetalleUsuario: React.FC = () => {
   const mostrarSeccionPerfil = !isNewUser && user?.tipo === 'ADMIN' && !!formik.values.tipo && formik.values.tipo !== 'ADMIN';
   // Select de perfil en creación: solo si hay perfiles disponibles para el tipo elegido
   const mostrarSelectCreacion = isNewUser && user?.tipo === 'ADMIN' && !!formik.values.tipo && formik.values.tipo !== 'ADMIN' && perfilesFiltrados.length > 0;
+  // El backend solo permite a ADMIN/SUPER_ADMIN crear administradores o cambiar el tipo de un usuario existente
+  const puedeGestionarAdmin = user?.tipo === 'ADMIN' || user?.tipo === 'SUPER_ADMIN';
+  const tipoBloqueado = !isNewUser && !puedeGestionarAdmin;
 
   return (
     <Box>
@@ -458,7 +461,7 @@ const DetalleUsuario: React.FC = () => {
                   <FormControl 
                     fullWidth
                     error={formik.touched.tipo && Boolean(formik.errors.tipo)}
-                    disabled={saveLoading}
+                    disabled={saveLoading || tipoBloqueado}
                   >
                     <InputLabel id="tipo-label">Tipo de Usuario</InputLabel>
                     <Select
@@ -474,7 +477,10 @@ const DetalleUsuario: React.FC = () => {
                       }}
                       onBlur={formik.handleBlur}
                     >
-                      <MenuItem value="ADMIN">Administrador</MenuItem>
+                      {/* Solo ADMIN/SUPER_ADMIN asignan el rol Administrador; se muestra si ya lo tiene para no dejar el Select vacío */}
+                      {(puedeGestionarAdmin || formik.values.tipo === 'ADMIN') && (
+                        <MenuItem value="ADMIN" disabled={!puedeGestionarAdmin}>Administrador</MenuItem>
+                      )}
                       <MenuItem value="DOCENTE">Docente</MenuItem>
                       <MenuItem value="ESTUDIANTE">Estudiante</MenuItem>
                       <MenuItem value="ACUDIENTE">Acudiente</MenuItem>
@@ -484,6 +490,9 @@ const DetalleUsuario: React.FC = () => {
                     </Select>
                     {formik.touched.tipo && formik.errors.tipo && (
                       <FormHelperText>{formik.errors.tipo}</FormHelperText>
+                    )}
+                    {tipoBloqueado && (
+                      <FormHelperText>Solo un Administrador puede cambiar el tipo de usuario</FormHelperText>
                     )}
                   </FormControl>
                 </Grid>

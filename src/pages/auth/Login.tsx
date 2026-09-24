@@ -170,11 +170,6 @@ const Login = () => {
                   <Link href="/forgot-password" variant="body2">
                     ¿Olvidaste tu contraseña?
                   </Link>
-                  <Box mt={1}>
-                    <Link href="/register" variant="body2">
-                      {"¿No tienes cuenta? Regístrate"}
-                    </Link>
-                  </Box>
                 </Box>
               </Form>
             )}

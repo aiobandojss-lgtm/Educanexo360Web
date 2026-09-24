@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
+import { useSelector } from 'react-redux';
 import {
   Box,
   Typography,
@@ -45,6 +46,7 @@ import {
 import axiosInstance from '../../api/axiosConfig';
 import { useNotificacion } from '../../components/common/Notificaciones';
 import { useListaEscuelas, QUERY_KEYS } from '../../hooks/useAppQueries';
+import { RootState } from '../../redux/store';
 
 // Interfaz para la escuela
 interface Escuela {
@@ -64,6 +66,9 @@ const ListaEscuelas = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { mostrarNotificacion } = useNotificacion();
+  const { user } = useSelector((state: RootState) => state.auth);
+  // Crear y eliminar escuelas es exclusivo de SUPER_ADMIN (el backend lo exige)
+  const esSuperAdmin = user?.tipo === 'SUPER_ADMIN';
 
   // Estados de UI
   const [busqueda, setBusqueda] = useState('');
@@ -175,7 +180,8 @@ const ListaEscuelas = () => {
             </CardContent>
           </Card>
         </Grid>
-        
+
+        {esSuperAdmin && (
         <Grid item xs={12} md={4}>
           <Card elevation={0} sx={{ boxShadow: '0px 4px 4px rgba(0, 0, 0, 0.05)', height: '100%' }}>
             <CardContent>
@@ -198,6 +204,7 @@ const ListaEscuelas = () => {
             </CardContent>
           </Card>
         </Grid>
+        )}
       </Grid>
       
       {/* Barra de búsqueda */}
@@ -264,13 +271,15 @@ const ListaEscuelas = () => {
           <Typography variant="body1" color="text.secondary" mb={3}>
             {busqueda ? 'No hay resultados para tu búsqueda. Intenta con otros términos.' : 'Aún no hay escuelas registradas.'}
           </Typography>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => navigate('/escuelas/nuevo')}
-          >
-            Crear Nueva Escuela
-          </Button>
+          {esSuperAdmin && (
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => navigate('/escuelas/nuevo')}
+            >
+              Crear Nueva Escuela
+            </Button>
+          )}
         </Paper>
       ) : (
         <Paper elevation={0} sx={{ boxShadow: '0px 4px 4px rgba(0, 0, 0, 0.05)', overflow: 'hidden' }}>
@@ -358,20 +367,22 @@ const ListaEscuelas = () => {
                         >
                           <EditIcon fontSize="small" />
                         </IconButton>
-                        
-                        <IconButton 
-                          size="small" 
-                          color="error" 
-                          onClick={() => confirmarEliminar(escuela)}
-                          sx={{ 
-                            bgcolor: 'rgba(244, 67, 54, 0.1)',
-                            '&:hover': {
-                              bgcolor: 'rgba(244, 67, 54, 0.2)',
-                            }
-                          }}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
+
+                        {esSuperAdmin && (
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={() => confirmarEliminar(escuela)}
+                            sx={{
+                              bgcolor: 'rgba(244, 67, 54, 0.1)',
+                              '&:hover': {
+                                bgcolor: 'rgba(244, 67, 54, 0.2)',
+                              }
+                            }}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        )}
                       </Box>
                     </TableCell>
                   </TableRow>
