@@ -88,6 +88,16 @@ const BuscarEstudianteExistente: React.FC<BuscarEstudianteExistenteProps> = ({
       return;
     }
 
+    // El servidor busca nombre/apellidos por inicio de palabra y exige mínimo 3 letras
+    const nombreCorto = ["nombre", "apellidos"].some((campo) => {
+      const valor = (criteriosBusqueda as Record<string, string>)[campo]?.trim() || "";
+      return valor.length > 0 && valor.length < 3;
+    });
+    if (nombreCorto) {
+      setError("Escriba al menos 3 letras del nombre o de los apellidos");
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -187,6 +197,7 @@ const BuscarEstudianteExistente: React.FC<BuscarEstudianteExistenteProps> = ({
                 onKeyPress={handleKeyPress}
                 disabled={loading}
                 placeholder="Ej: Juan"
+                helperText="Mínimo 3 letras, desde el inicio del nombre"
               />
             </Grid>
             <Grid item xs={12} sm={6}>
