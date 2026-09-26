@@ -602,7 +602,9 @@ const NuevoMensaje: React.FC = () => {
                       inputValue={inputValueDestinatario}
                       onChange={handleDestinatarioSeleccionado}
                       onInputChange={(_, value, reason) => {
-                        if (reason !== 'reset') {
+                        // Solo texto escrito o borrado por el usuario: en MUI v6 al elegir una opción
+                        // llega reason 'selectOption' con la etiqueta completa y dispararía una búsqueda vacía
+                        if (reason === 'input' || reason === 'clear') {
                           setInputValueDestinatario(value);
                           if (!isAcudiente) setQuery(value);
                         }
