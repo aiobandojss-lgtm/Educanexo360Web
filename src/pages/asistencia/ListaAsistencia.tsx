@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
-import { useAsistenciaCursos, useResumenAsistencia } from "../../hooks/useAppQueries";
+import { useAsistenciaCursos, useResumenAsistencia, useEstadisticasEstudiante } from "../../hooks/useAppQueries";
 import axiosInstance from "../../api/axiosConfig";
 import {
   Box,
@@ -136,6 +136,17 @@ const ListaAsistencia = () => {
   );
   const asistencias: AsistenciaResumen[] = (asistenciasRaw as AsistenciaResumen[]) || [];
 
+  // Para ESTUDIANTE/ACUDIENTE: estadísticas reales del alumno individual
+  const {
+    data: statsEstudianteRaw,
+    isLoading: loadingStats,
+  } = useEstadisticasEstudiante(
+    estudianteIdSeleccionado,
+    fechaInicio,
+    fechaFin,
+    esRolPersonal
+  );
+
   const error = (!esRolPersonal && errorCursos)
     ? "No se pudieron cargar los cursos: " + ((errorCursos as any)?.response?.data?.message || "Error del servidor")
     : errorAsistencias
@@ -253,7 +264,25 @@ const ListaAsistencia = () => {
     });
   }, [asistencias, fechaInicio, fechaFin]);
 
-  const estadisticas = calcularEstadisticas(asistenciasFiltradas);
+  // Para roles personales: usar estadísticas reales del alumno (estructura: data.estadisticas)
+  const estadisticasPersonal = React.useMemo(() => {
+    const s = (statsEstudianteRaw as any)?.estadisticas;
+    if (!s) return null;
+    return {
+      totalRegistros: s.clasesTotales ?? 0,
+      totalPresentes: s.presentes ?? 0,
+      totalAusentes: s.ausentes ?? 0,
+      totalTardes: s.tardanzas ?? 0,
+      totalJustificados: s.justificados ?? 0,
+      totalPermisos: s.permisos ?? 0,
+      totalEstudiantes: s.clasesTotales ?? 1,
+      promedioAsistencia: s.porcentajeAsistencia ?? 0,
+    };
+  }, [statsEstudianteRaw]);
+
+  const estadisticas = esRolPersonal
+    ? estadisticasPersonal
+    : calcularEstadisticas(asistenciasFiltradas);
   const puedeEditar = ["ADMIN", "DOCENTE"].includes(user?.tipo || "");
 
   return (
@@ -535,22 +564,65 @@ const ListaAsistencia = () => {
                 {!esRolPersonal && <TableCell align="center">Total Estudiantes</TableCell>}
                 {!esRolPersonal && <TableCell align="center">Presentes</TableCell>}
                 {!esRolPersonal && <TableCell align="center">Ausentes</TableCell>}
-                <TableCell align="center">% Asistencia</TableCell>
+                {!esRolPersonal && <TableCell align="center">% Asistencia</TableCell>}
                 {!esRolPersonal && <TableCell>Registrado Por</TableCell>}
                 <TableCell align="center">Estado</TableCell>
-                <TableCell align="center">Acciones</TableCell>
+                {!esRolPersonal && <TableCell align="center">Acciones</TableCell>}
               </TableRow>
             </TableHead>
             <TableBody>
-              {loading ? (
+              {(loading || (esRolPersonal && loadingStats)) ? (
                 <TableRow>
-                  <TableCell colSpan={esRolPersonal ? 7 : 10} align="center" sx={{ py: 3 }}>
+                  <TableCell colSpan={esRolPersonal ? 4 : 10} align="center" sx={{ py: 3 }}>
                     <CircularProgress size={30} />
                   </TableCell>
                 </TableRow>
+              ) : esRolPersonal ? (
+                // Tabla para ESTUDIANTE/ACUDIENTE: sesiones con estado individual del alumno
+                (() => {
+                  const registros: any[] = (statsEstudianteRaw as any)?.registros ?? [];
+                  if (registros.length === 0) {
+                    return (
+                      <TableRow>
+                        <TableCell colSpan={4} align="center" sx={{ py: 3 }}>
+                          <Typography variant="body1" color="text.secondary">
+                            No se encontraron registros de asistencia para los filtros seleccionados.
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  }
+                  return registros
+                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                    .map((reg: any, idx: number) => (
+                      <TableRow key={`${reg.fecha}-${idx}`} hover>
+                        <TableCell>{format(parseFechaLocal(reg.fecha), "dd/MM/yyyy")}</TableCell>
+                        <TableCell><strong>{reg.curso?.grado} {reg.curso?.grupo}</strong></TableCell>
+                        <TableCell>
+                          {reg.asignatura?.nombre
+                            ? reg.asignatura.nombre
+                            : <Typography variant="body2" color="text.secondary" fontStyle="italic">—</Typography>}
+                        </TableCell>
+                        <TableCell align="center">
+                          <Chip
+                            label={reg.estado}
+                            color={
+                              reg.estado === "PRESENTE" ? "success"
+                                : reg.estado === "AUSENTE" ? "error"
+                                : reg.estado === "TARDANZA" ? "warning"
+                                : reg.estado === "JUSTIFICADO" ? "info"
+                                : "default"
+                            }
+                            size="small"
+                            sx={{ borderRadius: 8 }}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ));
+                })()
               ) : asistenciasFiltradas.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={esRolPersonal ? 7 : 10} align="center" sx={{ py: 3 }}>
+                  <TableCell colSpan={10} align="center" sx={{ py: 3 }}>
                     <Typography variant="body1" color="text.secondary">
                       No se encontraron registros de asistencia para los filtros
                       seleccionados.
@@ -568,7 +640,7 @@ const ListaAsistencia = () => {
                         asistencia.finalizado
                           ? {}
                           : { bgcolor: "rgba(255, 243, 224, 0.2)" }
-                      } // Destacar registros no finalizados
+                      }
                     >
                       <TableCell>
                         {format(parseFechaLocal(asistencia.fecha), "dd/MM/yyyy")}
@@ -583,27 +655,21 @@ const ListaAsistencia = () => {
                           ? asistencia.asignatura.nombre
                           : <Typography variant="body2" color="text.secondary" fontStyle="italic">—</Typography>}
                       </TableCell>
-                      {!esRolPersonal && (
-                        <TableCell align="center">
-                          {asistencia.totalEstudiantes}
-                        </TableCell>
-                      )}
-                      {!esRolPersonal && (
-                        <TableCell align="center">
-                          {asistencia.presentes}
-                          <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
-                            ({Math.round((asistencia.presentes / asistencia.totalEstudiantes) * 100)}%)
-                          </Typography>
-                        </TableCell>
-                      )}
-                      {!esRolPersonal && (
-                        <TableCell align="center">
-                          {asistencia.ausentes}
-                          <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
-                            ({Math.round((asistencia.ausentes / asistencia.totalEstudiantes) * 100)}%)
-                          </Typography>
-                        </TableCell>
-                      )}
+                      <TableCell align="center">
+                        {asistencia.totalEstudiantes}
+                      </TableCell>
+                      <TableCell align="center">
+                        {asistencia.presentes}
+                        <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                          ({Math.round((asistencia.presentes / asistencia.totalEstudiantes) * 100)}%)
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="center">
+                        {asistencia.ausentes}
+                        <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                          ({Math.round((asistencia.ausentes / asistencia.totalEstudiantes) * 100)}%)
+                        </Typography>
+                      </TableCell>
                       <TableCell align="center">
                         <Chip
                           label={`${asistencia.porcentajeAsistencia}%`}
@@ -618,12 +684,10 @@ const ListaAsistencia = () => {
                           sx={{ borderRadius: 8 }}
                         />
                       </TableCell>
-                      {!esRolPersonal && (
-                        <TableCell>
-                          {asistencia.registradoPor?.nombre || "Usuario"}{" "}
-                          {asistencia.registradoPor?.apellidos || ""}
-                        </TableCell>
-                      )}
+                      <TableCell>
+                        {asistencia.registradoPor?.nombre || "Usuario"}{" "}
+                        {asistencia.registradoPor?.apellidos || ""}
+                      </TableCell>
                       <TableCell align="center">
                         <Chip
                           label={
@@ -659,7 +723,7 @@ const ListaAsistencia = () => {
                           </Tooltip>
 
                           {puedeEditar &&
-                            !asistencia.finalizado && ( // Solo mostrar editar si no está finalizado
+                            !asistencia.finalizado && (
                               <Tooltip title="Editar registro de asistencia">
                                 <IconButton
                                   size="small"
@@ -739,7 +803,9 @@ const ListaAsistencia = () => {
         <TablePagination
           rowsPerPageOptions={[5, 10, 25]}
           component="div"
-          count={asistenciasFiltradas.length}
+          count={esRolPersonal
+            ? ((statsEstudianteRaw as any)?.registros?.length ?? 0)
+            : asistenciasFiltradas.length}
           rowsPerPage={rowsPerPage}
           page={page}
           onPageChange={handleChangePage}

@@ -56,6 +56,7 @@ export const QUERY_KEYS = {
   MENSAJES: (bandeja: string, userId: string, pagina: number) => ["mensajes", bandeja, userId, pagina],
   ASISTENCIA_CURSOS: ["asistencia-cursos"],
   ASISTENCIA_RESUMEN: (inicio: string, fin: string, curso: string) => ["asistencia-resumen", inicio, fin, curso],
+  ASISTENCIA_ESTADISTICAS_ESTUDIANTE: (id: string, inicio: string, fin: string) => ["asistencia-stats-estudiante", id, inicio, fin],
   DETALLE_TAREA: (id: string, rol: string) => ["tarea-detalle", id, rol],
   MIS_TAREAS: (key: string) => ["mis-tareas", key],
   ANUNCIO_DETALLE: (id: string) => ["anuncio-detalle", id],
@@ -392,6 +393,22 @@ export const useResumenAsistencia = (
     enabled: esRolPersonal
       ? !!estudianteId
       : !!(cursoSeleccionado || ["ADMIN", "DOCENTE", "RECTOR", "COORDINADOR"].includes(userTipo)),
+  });
+};
+
+/** Estadísticas individuales de un estudiante, accesible por todos los roles. */
+export const useEstadisticasEstudiante = (
+  estudianteId: string,
+  fechaInicio: string,
+  fechaFin: string,
+  enabled = true
+) => {
+  return useQuery({
+    queryKey: QUERY_KEYS.ASISTENCIA_ESTADISTICAS_ESTUDIANTE(estudianteId, fechaInicio, fechaFin),
+    queryFn: () =>
+      asistenciaService.obtenerEstadisticasPorEstudiante(estudianteId, fechaInicio, fechaFin),
+    staleTime: 1000 * 60 * 2,
+    enabled: enabled && !!estudianteId,
   });
 };
 

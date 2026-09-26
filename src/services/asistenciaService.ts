@@ -359,6 +359,23 @@ export const obtenerResumenAsistencia = async (
   }
 };
 
+// Estadísticas individuales de un estudiante (accesible por todos los roles)
+// El backend espera los parámetros de fecha como "desde" y "hasta"
+export const obtenerEstadisticasPorEstudiante = async (
+  estudianteId: string,
+  desde?: string,
+  hasta?: string
+) => {
+  const params = new URLSearchParams();
+  if (desde) params.append("desde", desde);
+  if (hasta) params.append("hasta", hasta);
+  const query = params.toString();
+  const response = await axiosInstance.get(
+    `/asistencia/estadisticas/estudiante/${estudianteId}${query ? `?${query}` : ""}`
+  );
+  return response.data.data;
+};
+
 export default {
   obtenerRegistrosAsistencia,
   obtenerRegistroAsistencia,
@@ -367,12 +384,13 @@ export default {
   finalizarRegistroAsistencia,
   eliminarRegistroAsistencia,
   obtenerEstadisticasPorCurso,
+  obtenerEstadisticasPorEstudiante,
   obtenerAsistenciaPorDia,
   obtenerCursosDisponibles,
   obtenerAsignaturasPorCurso,
   obtenerEstudiantesPorCurso,
   obtenerResumenAsistencia,
-  descargarReporteAsistencia, // Añadimos la nueva función aquí
+  descargarReporteAsistencia,
   ESTADOS_ASISTENCIA,
   TIPOS_SESION,
 };
