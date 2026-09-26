@@ -107,8 +107,10 @@ const EventoDetalle = ({
 
     try {
       setDescargando(true);
-      const url = calendarioService.getAdjuntoUrl(evento._id);
-      window.open(url, "_blank");
+      await calendarioService.descargarAdjunto(
+        evento._id,
+        evento.archivoAdjunto.nombre
+      );
     } catch (error) {
       console.error("Error al descargar el archivo:", error);
       alert(
@@ -405,6 +407,18 @@ const CalendarioEscolar = () => {
     user?.tipo === "ADMINISTRATIVO" ||
     user?.tipo === "COORDINADOR" ||
     user?.tipo === "RECTOR";
+
+  // Editar, cancelar o cambiar el estado de un evento concreto: los roles administrativos
+  // gestionan todos; el DOCENTE solo los que creó (el backend aplica la misma regla)
+  const puedeGestionarEvento = (evento: IEvento): boolean => {
+    if (!canEditEvents) return false;
+    if (user?.tipo !== "DOCENTE") return true;
+    const creadorId =
+      typeof evento.creadorId === "object" && evento.creadorId !== null
+        ? evento.creadorId._id
+        : evento.creadorId;
+    return !!creadorId && String(creadorId) === String(user?._id);
+  };
 
   // 🚨 DETERMINAR QUÉ USUARIOS PUEDEN VER FILTROS DE ESTADO
   const canFilterByState =
@@ -1026,7 +1040,7 @@ const CalendarioEscolar = () => {
                           }
                         />
 
-                        {canEditEvents && (
+                        {puedeGestionarEvento(evento) && (
                           <Box>
                             <Tooltip title="Editar">
                               <IconButton
@@ -1261,11 +1275,19 @@ const CalendarioEscolar = () => {
                                 />
                                 <Typography variant="body2" color="primary">
                                   <Link
-                                    href={calendarioService.getAdjuntoUrl(
-                                      evento._id
-                                    )}
-                                    target="_blank"
-                                    onClick={(e) => e.stopPropagation()}
+                                    component="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      calendarioService
+                                        .descargarAdjunto(
+                                          evento._id,
+                                          evento.archivoAdjunto?.nombre || ""
+                                        )
+                                        .catch((error) => {
+                                          console.error("Error al descargar el archivo:", error);
+                                          alert("No se pudo descargar el archivo. Inténtalo de nuevo más tarde.");
+                                        });
+                                    }}
                                   >
                                     {evento.archivoAdjunto.nombre}
                                   </Link>
@@ -1276,7 +1298,7 @@ const CalendarioEscolar = () => {
                       }
                     />
 
-                    {canEditEvents && (
+                    {puedeGestionarEvento(evento) && (
                       <Box sx={{ display: "flex" }}>
                         <Tooltip title="Editar evento">
                           <IconButton
@@ -1348,10 +1370,10 @@ const CalendarioEscolar = () => {
           <EventoDetalle
             evento={eventoSeleccionado}
             onClose={() => setDetalleEventoAbierto(false)}
-            onEdit={canEditEvents ? handleEditarEvento : undefined}
-            onDelete={canEditEvents ? handleEliminarEvento : undefined}
+            onEdit={puedeGestionarEvento(eventoSeleccionado) ? handleEditarEvento : undefined}
+            onDelete={puedeGestionarEvento(eventoSeleccionado) ? handleEliminarEvento : undefined}
             onStateChange={handleStateChange}
-            canEdit={canEditEvents}
+            canEdit={puedeGestionarEvento(eventoSeleccionado)}
           />
         )}
       </Dialog>

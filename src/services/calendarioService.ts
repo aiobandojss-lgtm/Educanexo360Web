@@ -340,6 +340,25 @@ class CalendarioService {
   }
 
   /**
+   * Descarga el adjunto con el token de sesión (axios) y lo guarda con su nombre original.
+   * Un enlace directo no funciona porque el endpoint exige autenticación.
+   */
+  async descargarAdjunto(id: string, nombreArchivo: string): Promise<void> {
+    const response = await axiosInstance.get(
+      API_ROUTES.CALENDARIO.GET_ATTACHMENT(id),
+      { responseType: "blob" }
+    );
+    const url = window.URL.createObjectURL(response.data);
+    const enlace = document.createElement("a");
+    enlace.href = url;
+    enlace.download = nombreArchivo || "adjunto";
+    document.body.appendChild(enlace);
+    enlace.click();
+    enlace.remove();
+    window.URL.revokeObjectURL(url);
+  }
+
+  /**
    * Cambia el estado de un evento (PENDIENTE, ACTIVO, FINALIZADO, CANCELADO)
    */
   async cambiarEstadoEvento(
