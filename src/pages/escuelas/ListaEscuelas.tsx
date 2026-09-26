@@ -191,7 +191,7 @@ const ListaEscuelas = () => {
                   size="large"
                   startIcon={<AddIcon />}
                   fullWidth
-                  onClick={() => navigate('/escuelas/nuevo')}
+                  onClick={() => navigate('/escuelas/nueva')}
                   sx={{ 
                     py: 1.5,
                     fontSize: '1rem',
@@ -275,7 +275,7 @@ const ListaEscuelas = () => {
             <Button
               variant="contained"
               startIcon={<AddIcon />}
-              onClick={() => navigate('/escuelas/nuevo')}
+              onClick={() => navigate('/escuelas/nueva')}
             >
               Crear Nueva Escuela
             </Button>
