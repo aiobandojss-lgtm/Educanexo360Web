@@ -71,6 +71,7 @@ interface Mensaje {
   remitente: Usuario;
   destinatarios: Usuario[]; 
   destinatariosCc?: Usuario[];
+  totalDestinatarios?: number; // El backend recorta la lista en masivos; este es el total real
   tipo?: 'CIRCULAR' | 'INDIVIDUAL' | 'NOTIFICACION' | 'BORRADOR' | 'MASIVO' | 'GRUPAL';
   prioridad?: 'ALTA' | 'NORMAL' | 'BAJA';
   estado?: 'ENVIADO' | 'BORRADOR';
@@ -374,10 +375,11 @@ const archivarMensaje = async (id: string): Promise<void> => {
         : 'Remitente desconocido';
     } else {
       // Para bandeja enviados y borradores
+      const total = mensaje.totalDestinatarios ?? mensaje.destinatarios?.length ?? 0;
       if (mensaje.tipo === 'MASIVO' || mensaje.tipo === 'GRUPAL') {
-        return `Mensaje a curso ${mensaje.cursoNombre || ''} - ${mensaje.destinatarios?.length || 0} destinatarios`;
-      } else if (mensaje.destinatarios?.length > 1) {
-        return `${mensaje.destinatarios[0].nombre || ''} ${mensaje.destinatarios[0].apellidos || ''} (+${mensaje.destinatarios.length - 1} más)`;
+        return `Mensaje a curso ${mensaje.cursoNombre || ''} - ${total} destinatarios`;
+      } else if (total > 1 && mensaje.destinatarios?.length > 0) {
+        return `${mensaje.destinatarios[0].nombre || ''} ${mensaje.destinatarios[0].apellidos || ''} (+${total - 1} más)`;
       } else if (mensaje.destinatarios?.length === 1) {
         return `${mensaje.destinatarios[0].nombre || ''} ${mensaje.destinatarios[0].apellidos || ''}`;
       } else {

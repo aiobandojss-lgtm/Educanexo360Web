@@ -72,6 +72,7 @@ interface Mensaje {
   remitente: Usuario | null;
   destinatarios: Usuario[];
   destinatariosCc?: Usuario[];
+  totalDestinatarios?: number; // El backend recorta la lista en masivos; este es el total real
   tipo?: 'CIRCULAR' | 'INDIVIDUAL' | 'NOTIFICACION' | 'BORRADOR' | 'MASIVO' | 'GRUPAL';
   prioridad?: 'ALTA' | 'NORMAL' | 'BAJA';
   cursoId?: string;
@@ -493,7 +494,9 @@ const DetalleMensaje = () => {
       </Box>
     );
   }
-  
+
+  const totalDestinatarios = mensaje.totalDestinatarios ?? mensaje.destinatarios?.length ?? 0;
+
   return (
     <Box>
       {/* Barra superior con acciones */}
@@ -605,27 +608,32 @@ const DetalleMensaje = () => {
               <Box display="flex" alignItems="center" mt={0.5}>
                 {(mensaje.tipo === 'MASIVO' || mensaje.tipo === 'GRUPAL') ? (
                   <Typography variant="body2" color="text.secondary">
-                    Para: Curso completo - {mensaje.destinatarios?.length || 0} destinatarios
-                    <Button 
-                      size="small" 
-                      sx={{ ml: 1, minWidth: 0, p: 0 }}
-                      onClick={() => setShowDestinatarios(!showDestinatarios)}
-                    >
-                      {showDestinatarios ? 'Ocultar' : 'Ver todos'}
-                    </Button>
+                    Para: Curso completo - {totalDestinatarios} destinatarios
+                    {(mensaje.destinatarios?.length || 0) > 1 && (
+                      <Button 
+                        size="small" 
+                        sx={{ ml: 1, minWidth: 0, p: 0 }}
+                        onClick={() => setShowDestinatarios(!showDestinatarios)}
+                      >
+                        {showDestinatarios ? 'Ocultar' : 'Ver todos'}
+                      </Button>
+                    )}
                   </Typography>
                 ) : (
                   <Typography variant="body2" color="text.secondary">
                     Para: {mensaje.destinatarios && mensaje.destinatarios.length > 0 
                       ? `${mensaje.destinatarios[0].nombre || ''} ${mensaje.destinatarios[0].apellidos || ''}` 
                       : 'Destinatario desconocido'}
+                    {/* Quien no es remitente de un mensaje grande solo recibe su propia entrada */}
+                    {mensaje.destinatarios?.length === 1 && totalDestinatarios > 1 &&
+                      ` y ${totalDestinatarios - 1} más`}
                     {mensaje.destinatarios && mensaje.destinatarios.length > 1 && (
                       <Button 
                         size="small" 
                         sx={{ ml: 1, minWidth: 0, p: 0 }}
                         onClick={() => setShowDestinatarios(!showDestinatarios)}
                       >
-                        {showDestinatarios ? 'Ocultar' : `Ver todos (${mensaje.destinatarios.length})`}
+                        {showDestinatarios ? 'Ocultar' : `Ver todos (${totalDestinatarios})`}
                       </Button>
                     )}
                   </Typography>
