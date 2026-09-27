@@ -152,7 +152,7 @@ const DetalleSolicitud: React.FC = () => {
       await registroService.aprobarSolicitud(id);
 
       setSuccess(
-        "Solicitud aprobada exitosamente. Se han creado las cuentas de usuarios y enviado las credenciales por correo electrónico."
+        "Solicitud aprobada exitosamente. Se crearon las cuentas y se envió al acudiente un correo con los enlaces para definir las contraseñas (vencen en 72 horas)."
       );
       setOpenAprobarDialog(false);
 
@@ -477,8 +477,8 @@ const DetalleSolicitud: React.FC = () => {
               </li>
               <li>
                 Se enviará un correo electrónico a{" "}
-                <strong>{solicitud.email}</strong> con las credenciales de
-                acceso
+                <strong>{solicitud.email}</strong> con los enlaces para
+                definir las contraseñas (vencen en 72 horas)
               </li>
             </ul>
           </DialogContentText>

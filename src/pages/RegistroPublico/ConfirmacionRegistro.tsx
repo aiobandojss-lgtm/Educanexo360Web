@@ -66,7 +66,7 @@ const ConfirmacionRegistro: React.FC = () => {
             </ListItemIcon>
             <ListItemText
               primary="Recibirá un correo electrónico con la confirmación"
-              secondary="En caso de aprobación, recibirá las credenciales de acceso para usted y sus estudiantes"
+              secondary="En caso de aprobación, recibirá un correo con los enlaces para crear su contraseña y la de sus estudiantes"
             />
           </ListItem>
 
@@ -76,7 +76,7 @@ const ConfirmacionRegistro: React.FC = () => {
             </ListItemIcon>
             <ListItemText
               primary="Podrá acceder a la plataforma EducaNexo360"
-              secondary="Utilice las credenciales proporcionadas para acceder al sistema"
+              secondary="Después de crear su contraseña, ingrese con su correo electrónico"
             />
           </ListItem>
         </List>
