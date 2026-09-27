@@ -22,8 +22,10 @@ import API_ROUTES from "../../constants/apiRoutes";
 
 // Esquema de validación
 const ResetPasswordSchema = Yup.object().shape({
+  // El backend exige además al menos un número; se valida aquí para no recibir un 400
   password: Yup.string()
     .min(8, "La contraseña debe tener al menos 8 caracteres")
+    .matches(/\d/, "La contraseña debe incluir al menos un número")
     .required("La contraseña es requerida"),
   confirmPassword: Yup.string()
     .oneOf([Yup.ref("password")], "Las contraseñas deben coincidir")
