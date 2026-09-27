@@ -358,6 +358,18 @@ const DetalleUsuario: React.FC = () => {
   const puedeGestionarAdmin = user?.tipo === 'ADMIN' || user?.tipo === 'SUPER_ADMIN';
   const tipoBloqueado = !isNewUser && !puedeGestionarAdmin;
 
+  // Jerarquía del backend: un rol administrativo solo crea roles de rango estrictamente inferior
+  // (ADMIN y SUPER_ADMIN crean cualquiera). Evita ofrecer opciones que el servidor rechaza con 403.
+  const RANGO_ROL: Record<string, number> = {
+    SUPER_ADMIN: 6, ADMIN: 5, RECTOR: 4, COORDINADOR: 3, ADMINISTRATIVO: 2,
+    DOCENTE: 1, ESTUDIANTE: 1, ACUDIENTE: 1,
+  };
+  const puedeAsignarTipo = (tipo: string): boolean =>
+    puedeGestionarAdmin || (RANGO_ROL[tipo] ?? 0) < (RANGO_ROL[user?.tipo || ''] ?? 0);
+  // Se muestra si se puede asignar, o si es el valor actual (deshabilitado) para no dejar el Select vacío
+  const mostrarOpcionTipo = (tipo: string): boolean =>
+    puedeAsignarTipo(tipo) || formik.values.tipo === tipo;
+
   return (
     <Box>
       <Typography variant="h1" color="primary.main" gutterBottom>
@@ -484,9 +496,15 @@ const DetalleUsuario: React.FC = () => {
                       <MenuItem value="DOCENTE">Docente</MenuItem>
                       <MenuItem value="ESTUDIANTE">Estudiante</MenuItem>
                       <MenuItem value="ACUDIENTE">Acudiente</MenuItem>
-                      <MenuItem value="COORDINADOR">Coordinador</MenuItem>
-                      <MenuItem value="RECTOR">Rector</MenuItem>
-                      <MenuItem value="ADMINISTRATIVO">Administrativo</MenuItem>
+                      {mostrarOpcionTipo('COORDINADOR') && (
+                        <MenuItem value="COORDINADOR" disabled={!puedeAsignarTipo('COORDINADOR')}>Coordinador</MenuItem>
+                      )}
+                      {mostrarOpcionTipo('RECTOR') && (
+                        <MenuItem value="RECTOR" disabled={!puedeAsignarTipo('RECTOR')}>Rector</MenuItem>
+                      )}
+                      {mostrarOpcionTipo('ADMINISTRATIVO') && (
+                        <MenuItem value="ADMINISTRATIVO" disabled={!puedeAsignarTipo('ADMINISTRATIVO')}>Administrativo</MenuItem>
+                      )}
                     </Select>
                     {formik.touched.tipo && formik.errors.tipo && (
                       <FormHelperText>{formik.errors.tipo}</FormHelperText>
