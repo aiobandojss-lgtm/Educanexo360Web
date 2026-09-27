@@ -26,6 +26,7 @@ import {
   Save as SaveIcon,
   Cancel as CancelIcon,
   Key as KeyIcon,
+  Email as EmailIcon,
   Refresh as RefreshIcon,
   Shield as ShieldIcon,
   PersonRemove as PersonRemoveIcon,
@@ -72,6 +73,7 @@ const DetalleUsuario: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [saveLoading, setSaveLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [reenviandoEnlace, setReenviandoEnlace] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
   const [estudiantesAsociados, setEstudiantesAsociados] = useState<string[]>([]);
   const [escuelasLoaded, setEscuelasLoaded] = useState<boolean>(false);
@@ -370,6 +372,39 @@ const DetalleUsuario: React.FC = () => {
   const mostrarOpcionTipo = (tipo: string): boolean =>
     puedeAsignarTipo(tipo) || formik.values.tipo === tipo;
 
+  // Reenviar el enlace para definir la contraseña (backend 4.P): solo a usuarios activos de rango inferior.
+  // A un ESTUDIANTE el enlace le llega a sus acudientes, porque su correo es generado.
+  const puedeReenviarEnlace =
+    !isNewUser &&
+    formik.values.estado === 'ACTIVO' &&
+    !!formik.values.tipo &&
+    (user?.tipo === 'SUPER_ADMIN' ||
+      (RANGO_ROL[formik.values.tipo] ?? 99) < (RANGO_ROL[user?.tipo || ''] ?? 0) ||
+      (user?.tipo === 'ADMIN' && formik.values.tipo !== 'SUPER_ADMIN'));
+
+  const handleReenviarEnlace = async () => {
+    if (!id) return;
+    setReenviandoEnlace(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const response = await axiosInstance.post(`/usuarios/${id}/reenviar-enlace-password`);
+      const enviados = response.data?.data?.destinatarios;
+      setSuccess(
+        response.data?.message ||
+          (enviados ? `Enlace enviado a ${enviados} destinatario(s). Vence en 72 horas.` : 'Enlace enviado.')
+      );
+    } catch (err: any) {
+      setError(
+        err?.response?.status === 404 && !err?.response?.data?.message
+          ? 'Esta función aún no está disponible en el servidor.'
+          : err?.response?.data?.message || 'No se pudo enviar el enlace. Intente de nuevo.'
+      );
+    } finally {
+      setReenviandoEnlace(false);
+    }
+  };
+
   return (
     <Box>
       <Typography variant="h1" color="primary.main" gutterBottom>
@@ -623,7 +658,21 @@ const DetalleUsuario: React.FC = () => {
                         Cambiar Contraseña
                       </Button>
                     )}
-                    
+
+                    {puedeReenviarEnlace && (
+                      <Button
+                        variant="outlined"
+                        startIcon={reenviandoEnlace ? <CircularProgress size={18} /> : <EmailIcon />}
+                        onClick={handleReenviarEnlace}
+                        disabled={saveLoading || reenviandoEnlace}
+                        sx={{ borderRadius: '20px' }}
+                      >
+                        {formik.values.tipo === 'ESTUDIANTE'
+                          ? 'Enviar enlace a sus acudientes'
+                          : 'Enviar enlace de contraseña'}
+                      </Button>
+                    )}
+
                     <Button
                       variant="outlined"
                       startIcon={<CancelIcon />}
