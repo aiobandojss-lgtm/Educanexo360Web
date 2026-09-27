@@ -32,6 +32,7 @@ import { format } from 'date-fns';
 import { RootState } from '../../redux/store';
 import { useDetalleUsuarioPerfil, usePerfilesRol } from '../../hooks/useAppQueries';
 import { PerfilRol } from '../../types/user.types';
+import PreferenciasCorreo from '../../components/perfil/PreferenciasCorreo';
 
 // Interfaces para manejar diferentes tipos de datos
 interface EscuelaId {
@@ -277,7 +278,6 @@ const PerfilUsuario = () => {
             sx={{ 
               borderRadius: 3,
               boxShadow: '0px 4px 4px rgba(0, 0, 0, 0.05)',
-              height: '100%'
             }}
           >
             <CardContent>
@@ -330,6 +330,8 @@ const PerfilUsuario = () => {
               </List>
             </CardContent>
           </Card>
+
+          <PreferenciasCorreo />
         </Grid>
       </Grid>
     </Box>
