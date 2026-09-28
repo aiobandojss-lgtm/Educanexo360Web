@@ -50,6 +50,7 @@ import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import mensajeService from '../../services/mensajeService';
 import { USER_ROLES } from '../../types/user.types';
+import { ACCEPT_ARCHIVOS, MENSAJE_TIPO_NO_PERMITIDO, esArchivoPermitido } from '../../constants/archivosPermitidos';
 
 // Configuración de Quill
 const quillModules = {
@@ -403,7 +404,9 @@ const NuevoMensaje: React.FC = () => {
   // Manejo de archivos adjuntos
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
-      const newFiles = Array.from(event.target.files);
+      const seleccionados = Array.from(event.target.files);
+      const newFiles = seleccionados.filter(esArchivoPermitido);
+      if (newFiles.length < seleccionados.length) setError(MENSAJE_TIPO_NO_PERMITIDO);
       setAdjuntos((prevAdjuntos) => [...prevAdjuntos, ...newFiles]);
     }
   };
@@ -890,6 +893,7 @@ const NuevoMensaje: React.FC = () => {
                 Agregar Adjunto
                 <input
                   type="file"
+                  accept={ACCEPT_ARCHIVOS}
                   hidden
                   multiple
                   onChange={handleFileChange}

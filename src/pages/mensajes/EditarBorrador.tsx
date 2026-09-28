@@ -52,6 +52,7 @@ import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
 import mensajeService from "../../services/mensajeService";
 import { IBorrador, ROLES_CON_BORRADORES } from "../../types/mensaje.types";
+import { ACCEPT_ARCHIVOS, MENSAJE_TIPO_NO_PERMITIDO, esArchivoPermitido } from '../../constants/archivosPermitidos';
 
 // Configuración de Quill
 const quillModules = {
@@ -495,7 +496,9 @@ const EditarBorrador: React.FC = () => {
   // Manejo de archivos adjuntos
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
-      const newFiles = Array.from(event.target.files) as AdjuntoUI[];
+      const seleccionados = Array.from(event.target.files);
+      const newFiles = seleccionados.filter(esArchivoPermitido) as AdjuntoUI[];
+      if (newFiles.length < seleccionados.length) setError(MENSAJE_TIPO_NO_PERMITIDO);
       setAdjuntos((prevAdjuntos) => [...prevAdjuntos, ...newFiles]);
     }
   };
@@ -931,6 +934,7 @@ const EditarBorrador: React.FC = () => {
                 Agregar Adjunto
                 <input
                   type="file"
+                  accept={ACCEPT_ARCHIVOS}
                   hidden
                   multiple
                   onChange={handleFileChange}

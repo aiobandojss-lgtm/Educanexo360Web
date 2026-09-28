@@ -34,6 +34,7 @@ import {
   ArchivoAdjunto,
 } from "../../types/anuncio.types";
 import useAuth from "../../hooks/useAuth";
+import { ACCEPT_ARCHIVOS, MENSAJE_TIPO_NO_PERMITIDO, esArchivoPermitido } from '../../constants/archivosPermitidos';
 
 const FormularioAnuncio: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -118,7 +119,9 @@ const FormularioAnuncio: React.FC = () => {
   // Manejar selección de archivos
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      const fileArray = Array.from(e.target.files);
+      const seleccionados = Array.from(e.target.files);
+      const fileArray = seleccionados.filter(esArchivoPermitido);
+      if (fileArray.length < seleccionados.length) setError(MENSAJE_TIPO_NO_PERMITIDO);
       setArchivos((prev) => [...prev, ...fileArray]);
     }
   };
@@ -400,6 +403,7 @@ const FormularioAnuncio: React.FC = () => {
                 Seleccionar archivos
                 <input
                   type="file"
+                  accept={ACCEPT_ARCHIVOS}
                   hidden
                   multiple
                   onChange={handleFileChange}

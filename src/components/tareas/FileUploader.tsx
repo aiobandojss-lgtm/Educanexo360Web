@@ -16,6 +16,11 @@ import {
   Delete as DeleteIcon,
   InsertDriveFile as FileIcon,
 } from "@mui/icons-material";
+import {
+  ACCEPT_ARCHIVOS,
+  MENSAJE_TIPO_NO_PERMITIDO,
+  esArchivoPermitido,
+} from "../../constants/archivosPermitidos";
 
 interface FileUploaderProps {
   files: File[];
@@ -32,7 +37,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
   onFilesChange,
   maxFiles = 5,
   maxSizeMB = 10,
-  acceptedTypes = ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.jpg,.jpeg,.png,.zip",
+  acceptedTypes = ACCEPT_ARCHIVOS,
   label = "Archivos adjuntos",
   disabled = false,
 }) => {
@@ -58,6 +63,12 @@ const FileUploader: React.FC<FileUploaderProps> = ({
     // Verificar cantidad máxima
     if (files.length + fileArray.length > maxFiles) {
       setError(`Solo puedes subir hasta ${maxFiles} archivos`);
+      return null;
+    }
+
+    // Verificar tipo (arrastrar y soltar se salta el accept del input)
+    if (fileArray.some((file) => !esArchivoPermitido(file))) {
+      setError(MENSAJE_TIPO_NO_PERMITIDO);
       return null;
     }
 
