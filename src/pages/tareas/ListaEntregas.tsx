@@ -109,9 +109,14 @@ const ListaEntregas: React.FC = () => {
     );
   }
 
-  const entregadas = entregas.filter(
-    (e) => e.estado === "ENTREGADA" || e.estado === "CALIFICADA"
-  ).length;
+  // ATRASADA sirve tanto para una entrega tardía (tiene fechaEntrega) como para una vencida sin entregar:
+  // solo la primera cuenta como entregada y se puede calificar
+  const fueEntregada = (e: { estado: string; fechaEntrega?: string }) =>
+    e.estado === "ENTREGADA" ||
+    e.estado === "CALIFICADA" ||
+    (e.estado === "ATRASADA" && !!e.fechaEntrega);
+
+  const entregadas = entregas.filter(fueEntregada).length;
   const calificadas = entregas.filter((e) => e.estado === "CALIFICADA").length;
   const pendientes = entregas.filter((e) => e.estado === "PENDIENTE").length;
 
@@ -254,8 +259,7 @@ const ListaEntregas: React.FC = () => {
                     )}
                   </TableCell>
                   <TableCell align="center">
-                    {(entrega.estado === "ENTREGADA" ||
-                      entrega.estado === "CALIFICADA") && (
+                    {fueEntregada(entrega) && (
                       <Button
                         variant={
                           entrega.estado === "CALIFICADA"
